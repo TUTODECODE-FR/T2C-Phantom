@@ -71,7 +71,7 @@ Notre mission est de démocratiser la maîtrise des infrastructures informatique
 
 Dans une démarche absolue de transparence et de rigueur, l'association publie ses identifiants légaux officiels :
 
-- **Éditeur** : Association Loi 1901 TUTO DECODE
+- **Éditeur** : Association Loi 1901 TUTODECODE
 - **Directeur de Publication** : Maxime MARTIN CIVET
 - **SIREN** : 102 763 133
 - **Site Web Officiel** : [https://tutodecode.org](https://tutodecode.org)
