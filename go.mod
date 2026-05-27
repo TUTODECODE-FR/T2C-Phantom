@@ -6,6 +6,7 @@ require (
 	github.com/libp2p/go-libp2p v0.33.2
 	github.com/libp2p/go-libp2p-kad-dht v0.25.2
 	github.com/multiformats/go-multiaddr v0.12.3
+	golang.org/x/mobile v0.0.0-20260520154334-0e4426e1883d
 )
 
 require (
