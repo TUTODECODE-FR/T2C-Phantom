@@ -58,9 +58,6 @@ jobs:
         with:
           files: |
             t2c-${{ matrix.goos }}-${{ matrix.goarch }}*
-            install_windows.bat
-            install_mac_linux.sh
-            data/carnet.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -96,9 +93,13 @@ jobs:
       - name: Build Android AAR
         run: gomobile bind -target=android -o t2c-android.aar t2c/pkg/api
 
-      - name: Upload Android AAR
+      - name: Upload Assets
         uses: softprops/action-gh-release@v1
         with:
-          files: t2c-android.aar
+          files: |
+            t2c-android.aar
+            install_windows.bat
+            install_mac_linux.sh
+            data/carnet.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
