@@ -62,5 +62,24 @@ Vous n'êtes **PAS** autorisé à :
 
 *Toute violation de ces conditions entraînera des poursuites pour violation de droits d'auteur.*
 
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
+## 🏛️ L'Association TUTODECODE (Mentions Légales)
+
+Le projet T2DECODE et le réseau T2C Phantom sont développés et soutenus par l'**Association TUTODECODE**, structure relevant de l'Économie Sociale et Solidaire (ESS).  
+Notre mission est de démocratiser la maîtrise des infrastructures informatiques et de la cybersécurité défensive en fournissant des outils souverains, auditables et respectueux de la vie privée.
+
+Dans une démarche absolue de transparence et de rigueur, l'association publie ses identifiants légaux officiels :
+
+- **Éditeur** : Association Loi 1901 TUTO DECODE
+- **Directeur de Publication** : Maxime MARTIN CIVET
+- **SIREN** : 102 763 133
+- **Site Web Officiel** : [https://tutodecode.org](https://tutodecode.org)
+- **Preuve Légale** : [Annonce de création parue au Journal Officiel de la République Française (JOAFE)](https://www.journal-officiel.gouv.fr/pages/associations-detail-annonce/?q.id=id:202600110336)
+
+### 💖 Soutien Financier (Dons)
+Si nos outils gratuits et sans publicité vous font gagner du temps ou enrichissent votre parcours professionnel, vous pouvez soutenir l'association TUTODECODE. Les dons servent exclusivement à pérenniser l'hébergement de nos services, le maintien des noms de domaine et la continuité de nos actions éducatives.
+- ➡️ **[Faire un don sécurisé à l'association via HelloAsso](https://www.helloasso.com/associations/tutodecode)**
+
 ---
 © 2026 TUTODECODE - Tous droits réservés.
