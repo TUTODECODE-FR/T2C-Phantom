@@ -1,17 +1,11 @@
 package main
 
 import (
-	"context"
 	"encoding/base64"
-	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"t2c/pkg/crypto"
-	"t2c/pkg/p2p"
-	"t2c/pkg/proxy"
-	"t2c/pkg/service"
 	"t2c/pkg/api"
 
 	ic "github.com/libp2p/go-libp2p/core/crypto"
