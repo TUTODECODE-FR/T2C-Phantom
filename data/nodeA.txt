@@ -1,0 +1,4 @@
+=== T2C Identity Generated ===
+Address (.t2c): xorgcvib6neoowgdipnj3vi4clqx6y5ho3w7oub7ee2awsymlkaq.t2c
+Private Key: CAESQBUYOqG32/DaP8/jrJ/KY5CL9smkO//rlJKASkc3RzSju6JhVQHzSOdYw0PandUcEuF/Y6d27fdQPyE0C0sMWoE=
+(Save this Private Key to start your daemon later)

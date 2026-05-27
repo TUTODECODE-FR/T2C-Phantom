@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T2C - Overlay Network</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <h1>T2C</h1>
+                <span class="badge">Air-Gapped</span>
+            </div>
+            <ul class="nav-links">
+                <li class="active" onclick="switchTab('client')">Navigateur Privé</li>
+            </ul>
+            <div class="status-indicator">
+                <div class="dot" id="statusDot"></div>
+                <span id="statusText">DÉCONNECTÉ</span>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Client Tab -->
+            <section id="client-tab" class="tab-content active">
+                <div class="header">
+                    <h2>Navigation Privée P2P</h2>
+                    <p>Naviguez sur le réseau .t2c avec une identité éphémère jetable et un routage masqué.</p>
+                </div>
+                
+                <div class="card glass">
+                    <div class="card-header">
+                        <h3>Lancer le Proxy</h3>
+                    </div>
+                    <div class="form-group">
+                        <label>Adresse du Relais (Optionnel)</label>
+                        <input type="text" id="clientRelay" placeholder="/ip4/127.0.0.1/tcp/4000/p2p/...">
+                        <small>Laissez vide pour utiliser le réseau local / mDNS directement.</small>
+                    </div>
+                    <button class="btn btn-primary glow" id="btnStartClient" onclick="startClient()">Lancer la connexion sécurisée</button>
+                    <button class="btn btn-danger hidden" id="btnStopClient" onclick="stopNode()">Déconnecter & Détruire l'identité</button>
+                </div>
+
+                <div class="info-card hidden" id="clientInfo">
+                    <h3>Bouclier Actif & Anonymat Garanti !</h3>
+                    <p>Votre identité réseau est complètement masquée.</p>
+                    
+                    <div class="search-box mt-4">
+                        <p>Pour naviguer sur le réseau P2P, configurez le proxy de votre navigateur sur <strong>127.0.0.1:8080</strong>, puis tapez n'importe quelle adresse `.t2c` :</p>
+                        <div class="fake-browser-bar">
+                            <span class="lock-icon">🔒</span>
+                            <span class="url-text">http://tutodecode.t2c</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
