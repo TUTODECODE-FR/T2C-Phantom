@@ -39,7 +39,7 @@ Les binaires pré-compilés sont disponibles dans le dossier `build/` pour Windo
    ./t2c dashboard
    ```
 3. Ouvrez l'interface graphique dans votre navigateur à l'adresse : **http://127.0.0.1:9090**
-4. Entrez l'adresse de relais (si fournie) et cliquez sur **Lancer la connexion sécurisée**.
+4. Cliquez sur **Lancer la connexion sécurisée**.
 5. Vous pouvez désormais naviguer sur les sites `.t2c` via le proxy interne !
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
