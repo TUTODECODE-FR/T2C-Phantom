@@ -1,0 +1,62 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # S'active quand un tag commence par 'v' (ex: v1.0.0)
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build T2C Phantom
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: darwin
+            goarch: amd64
+            ext: ''
+          - goos: darwin
+            goarch: arm64
+            ext: ''
+          - goos: linux
+            goarch: amd64
+            ext: ''
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          
+      - name: Install Dependencies
+        run: go mod download
+
+      - name: Build Binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          OUTPUT_NAME=t2c-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          go build -ldflags="-s -w" -o $OUTPUT_NAME cmd/t2c/main.go
+          
+          # Compress binary on linux/mac (optional, helps with permissions)
+          if [ "${{ matrix.goos }}" != "windows" ]; then
+            chmod +x $OUTPUT_NAME
+          fi
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: t2c-${{ matrix.goos }}-${{ matrix.goarch }}*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
