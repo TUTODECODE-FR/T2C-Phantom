@@ -1,14 +1,37 @@
-# T2C Phantom - Réseau Overlay Sécurisé
+<div align="center">
+  <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/TDC.png" width="160" height="160" alt="T2C Logo">
 
-T2C (TutoDeCode) Phantom est un client de connexion furtif permettant d'accéder à des ressources éducatives et des services cachés hébergés sur le réseau P2P décentralisé T2DECODE.
+  # T2C Phantom
+  
+  **« Le savoir ne devrait pas toujours dépendre d'une connexion... ni d'un censeur. »**<br>
+  — *Maxime MARTIN CIVET*
+
+  [![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E)]()
+  [![libp2p](https://img.shields.io/badge/libp2p-000000?style=for-the-badge&logo=ipfs&logoColor=white&labelColor=1A1D2E)]()
+  [![Proprietary](https://img.shields.io/badge/License-All_Rights_Reserved-D93025?style=for-the-badge&labelColor=1A1D2E)]()
+  [![Privacy By Design](https://img.shields.io/badge/Privacy-By%20Design-3DDC84?style=for-the-badge&labelColor=1A1D2E&color=3DDC84)]()
+  
+  <br>
+  <p>
+    <b>Client furtif pour le réseau décentralisé T2DECODE (Overlay Network).</b><br>
+    <i>Chiffrement de bout en bout · DHT Kademlia · Zéro Serveur Central · Zéro Télémétrie</i>
+  </p>
+  <br>
+</div>
+
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
+## 🎯 Raison d'Être de T2C Phantom
+
+T2C Phantom est un **client de connexion réseau souverain** permettant d'accéder à des ressources éducatives et des services cachés hébergés sur le réseau P2P décentralisé T2DECODE.
 
 Ce logiciel établit un tunnel chiffré de bout-en-bout via le protocole Kademlia DHT (libp2p), garantissant l'anonymat et la résistance à la censure.
 
-## Téléchargement
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
+## 📥 Téléchargement et Utilisation
 
 Les binaires pré-compilés sont disponibles dans le dossier `build/` pour Windows, macOS et Linux.
-
-## Utilisation
 
 1. Téléchargez l'exécutable correspondant à votre système d'exploitation.
 2. Lancez le client via votre terminal :
@@ -19,9 +42,9 @@ Les binaires pré-compilés sont disponibles dans le dossier `build/` pour Windo
 4. Entrez l'adresse de relais (si fournie) et cliquez sur **Lancer la connexion sécurisée**.
 5. Vous pouvez désormais naviguer sur les sites `.t2c` via le proxy interne !
 
----
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## ⚠️ Avertissement Légal & Propriété Intellectuelle (All Rights Reserved)
+## ⚠️ Avertissement Légal & Propriété Intellectuelle
 
 Ce code source est publié publiquement **uniquement à des fins de transparence, d'audit de sécurité et de démonstration technique**. 
 
@@ -40,4 +63,4 @@ Vous n'êtes **PAS** autorisé à :
 *Toute violation de ces conditions entraînera des poursuites pour violation de droits d'auteur.*
 
 ---
-© 2026 TutoDeCode (Winancher) - Tous droits réservés.
+© 2026 TUTODECODE - Tous droits réservés.
