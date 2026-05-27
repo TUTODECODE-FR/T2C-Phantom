@@ -37,14 +37,13 @@ async function fetchStatus() {
 }
 
 async function startClient() {
-    const relay = document.getElementById('clientRelay').value;
     const btn = document.getElementById('btnStartClient');
     btn.innerText = "Lancement...";
     
     await fetch('/api/client/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ relay_addr: relay })
+        body: JSON.stringify({ relay_addr: "" })
     });
     
     btn.innerText = "Lancer la connexion sécurisée";
