@@ -29,18 +29,22 @@ Ce logiciel établit un tunnel chiffré de bout-en-bout via le protocole Kademli
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 📥 Téléchargement et Utilisation
+## 📥 Téléchargement et Installation Plug & Play
 
-Les binaires pré-compilés sont disponibles dans le dossier `build/` pour Windows, macOS et Linux.
+Pour une expérience sans configuration, **téléchargez directement le script d'installation spécial pour votre système** depuis la section "Releases" :
+- **Windows** : Téléchargez et lancez `install_windows.bat`.
+- **macOS / Linux** : Téléchargez et exécutez `install_mac_linux.sh`.
+- **Android** : La librairie native `t2c-android.aar` est générée automatiquement. (Elle est conçue pour être importée dans notre APK Android complet).
 
-1. Téléchargez l'exécutable correspondant à votre système d'exploitation.
-2. Lancez le client via votre terminal :
-   ```bash
-   ./t2c dashboard
-   ```
-3. Ouvrez l'interface graphique dans votre navigateur à l'adresse : **http://127.0.0.1:9090**
-4. Cliquez sur **Lancer la connexion sécurisée**.
-5. Vous pouvez désormais naviguer sur les sites `.t2c` via le proxy interne !
+Ces scripts se chargeront de :
+1. Télécharger le bon exécutable silencieusement.
+2. **Télécharger le fichier le plus important du réseau : `carnet.json`.** (Ce fichier contient l'annuaire décentralisé pour trouver les ressources).
+3. Lancer l'application et ouvrir automatiquement votre navigateur sur **http://127.0.0.1:9090**.
+
+Si vous souhaitez le lancer manuellement, vous pouvez télécharger les binaires, vous assurer que le `carnet.json` est placé dans le dossier `data/`, et exécuter :
+```bash
+./t2c dashboard
+```
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 

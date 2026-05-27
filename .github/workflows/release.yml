@@ -60,6 +60,7 @@ jobs:
             t2c-${{ matrix.goos }}-${{ matrix.goarch }}*
             install_windows.bat
             install_mac_linux.sh
+            data/carnet.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

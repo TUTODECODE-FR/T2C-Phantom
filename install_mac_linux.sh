@@ -22,8 +22,12 @@ fi
 
 URL="https://github.com/TUTODECODE-FR/T2C-Phantom/releases/latest/download/$FILE"
 
-echo "Téléchargement de $FILE depuis GitHub..."
+echo "Téléchargement de l'application depuis GitHub..."
 curl -L -o t2c "$URL"
+
+echo "Téléchargement du carnet d'adresses (carnet.json)..."
+mkdir -p data
+curl -s -L -o data/carnet.json "https://raw.githubusercontent.com/TUTODECODE-FR/T2C-Phantom/main/data/carnet.json"
 
 if [ -f "t2c" ]; then
     chmod +x t2c

@@ -7,7 +7,11 @@ set LATEST_URL=https://github.com/TUTODECODE-FR/T2C-Phantom/releases/latest/down
 set EXECUTABLE=t2c-windows-amd64.exe
 
 echo Telechargement de l'application depuis GitHub...
-curl -L -o %EXECUTABLE% %LATEST_URL%
+curl -s -L -o %EXECUTABLE% %LATEST_URL%
+
+echo Telechargement du carnet d'adresses (carnet.json)...
+mkdir data 2>nul
+curl -s -L -o data\carnet.json https://raw.githubusercontent.com/TUTODECODE-FR/T2C-Phantom/main/data/carnet.json
 
 if exist %EXECUTABLE% (
     echo Telechargement reussi ! Lancement...
