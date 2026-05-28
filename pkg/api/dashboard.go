@@ -12,6 +12,7 @@ import (
 	"t2c/pkg/crypto"
 	"t2c/pkg/p2p"
 	"t2c/pkg/proxy"
+	"t2c/pkg/service"
 )
 
 type Dashboard struct {
@@ -43,6 +44,7 @@ func (d *Dashboard) Start(port int) error {
 
 	mux.HandleFunc("/api/status", d.handleStatus)
 	mux.HandleFunc("/api/client/start", d.handleStartClient)
+	mux.HandleFunc("/api/server/start", d.handleStartServer)
 	mux.HandleFunc("/api/stop", d.handleStop)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
@@ -138,6 +140,54 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 }
 
 
+
+func (d *Dashboard) handleStartServer(w http.ResponseWriter, r *http.Request) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.node != nil {
+		http.Error(w, "Node already running", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		LocalPort          int  `json:"local_port"`
+		AllowGlobalCaching bool `json:"allow_caching"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.LocalPort <= 0 {
+		http.Error(w, "Invalid local port", http.StatusBadRequest)
+		return
+	}
+
+	priv, pub, _ := crypto.GenerateKeyPair()
+	addr, _ := crypto.GetT2CAddress(pub)
+	d.address = addr
+
+	ctx, cancel := context.WithCancel(context.Background())
+	d.cancelNode = cancel
+
+	// Start as a relay node on port 4001
+	node, err := p2p.NewNode(ctx, priv, 4001, true)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	d.node = node
+
+	// Server mode specific settings
+	node.SwarmManager.DisableSeeding = false
+	// We can control the swarm manager to restrict caching of this node's content if needed.
+	// (Placeholder for actual content policy configuration)
+
+	// Expose local service
+	d.exposePort = req.LocalPort
+	go service.ExposeService(ctx, node, req.LocalPort)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+}
 
 func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {
 	d.mu.Lock()

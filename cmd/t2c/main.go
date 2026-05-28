@@ -44,6 +44,13 @@ func main() {
 			fmt.Println("Dashboard error:", err)
 		}
 
+	case "server":
+		fmt.Println("Starting Web Dashboard (Admin/Host Mode)...")
+		dashboard := api.NewDashboard(true)
+		if err := dashboard.Start(9091); err != nil {
+			fmt.Println("Dashboard error:", err)
+		}
+
 	default:
 		printHelp()
 	}
@@ -53,5 +60,6 @@ func printHelp() {
 	fmt.Println("T2C-Phantom Overlay Network Node")
 	fmt.Println("\nUsage:")
 	fmt.Println("  t2c genkey         Generate a new identity")
-	fmt.Println("  t2c dashboard      Start the User Interface (Port 9090)")
+	fmt.Println("  t2c dashboard      Start the Client Dashboard (Port 9090)")
+	fmt.Println("  t2c server         Start the Admin/Host Dashboard (Port 9091)")
 }
