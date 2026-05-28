@@ -48,6 +48,17 @@ Ils s'occupent de tout en 3 secondes chrono :
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
+## ✨ Interface Web Premium (Client)
+
+Le Dashboard local (`http://127.0.0.1:9090`) a été entièrement repensé avec une interface haut de gamme "Noir & Beige", fidèle au design system de T2DECODE.
+
+- 🎛️ **Options de Confidentialité Avancées** : Choisissez de masquer votre IP via des relais communautaires ou de devenir vous-même un relais.
+- 🤝 **Partage d'Hébergement** : Activez la copie temporaire des sites pour contribuer à la robustesse du réseau.
+- 🛡️ **Feedback de Sécurité** : Suivi de l'état de la connexion et instructions de proxy interactives.
+- 🏛️ **Fiche d'Identité Transparente** : Retrouvez toutes les informations légales de l'association directement intégrées.
+
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
 ## ⚠️ Propriété Intellectuelle
 
 > [!WARNING]
