@@ -15,11 +15,15 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/multiformats/go-multiaddr"
+	"t2c/pkg/onion"
+	"t2c/pkg/swarm"
 )
 
 type Node struct {
-	Host host.Host
-	DHT  *dht.IpfsDHT
+	Host         host.Host
+	DHT          *dht.IpfsDHT
+	ExitPort     int
+	SwarmManager *swarm.SwarmManager
 }
 
 type discoveryNotifee struct {
@@ -64,10 +68,17 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 	mdnsService := mdns.NewMdnsService(h, "t2c-local-discovery", &discoveryNotifee{h: h})
 	mdnsService.Start()
 
-	return &Node{
+	n := &Node{
 		Host: h,
 		DHT:  idht,
-	}, nil
+	}
+
+	n.SwarmManager = swarm.NewSwarmManager(h, idht, "data/swarm_zips")
+
+	// Register this node to be an Onion Relay on the network
+	onion.RegisterOnionRelay(h, func() int { return n.ExitPort })
+
+	return n, nil
 }
 
 // ReserveRelay connects to a relay node and reserves a slot to be reachable via circuit.

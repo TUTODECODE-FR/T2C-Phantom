@@ -1,114 +1,137 @@
 package proxy
 
 import (
-	"context"
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"net"
+	"io"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"strings"
 
-	"t2c/pkg/crypto"
-	"t2c/pkg/p2p"
-	"t2c/pkg/service"
-
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
+	"t2c/pkg/crypto"
+	"t2c/pkg/onion"
+	"t2c/pkg/p2p"
+	"t2c/pkg/swarm"
 )
 
-// streamConn implements net.Conn over a libp2p stream.
-type streamConn struct {
-	network.Stream
-}
-
-func (c *streamConn) LocalAddr() net.Addr {
-	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
-}
-
-func (c *streamConn) RemoteAddr() net.Addr {
-	return &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
-}
-
 func resolveCarnetAlias(carnetPath, host string) string {
-	if carnetPath == "" {
-		return host
-	}
-	
-	data, err := os.ReadFile(carnetPath)
+	carnetData, err := os.ReadFile(carnetPath)
 	if err != nil {
-		return host // File doesn't exist or is unreadable, ignore
-	}
-
-	var aliases map[string]string
-	if err := json.Unmarshal(data, &aliases); err != nil {
-		fmt.Printf("Error parsing carnet: %v\n", err)
 		return host
 	}
 
-	for k, v := range aliases {
-		if strings.EqualFold(k, host) {
-			return v
-		}
+	var carnet map[string]string
+	if err := json.Unmarshal(carnetData, &carnet); err != nil {
+		return host
 	}
+
+	if alias, exists := carnet[host]; exists {
+		return alias
+	}
+
 	return host
 }
 
 func StartProxyServer(node *p2p.Node, listenAddr, carnetPath string) error {
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, networkLayer, addr string) (net.Conn, error) {
-			host := strings.Split(addr, ":")[0]
-			
-			// Naming Service: Check local carnet.json for aliases
-			resolvedHost := resolveCarnetAlias(carnetPath, host)
+	carnetData, _ := os.ReadFile(carnetPath)
+	var carnet map[string]string
+	json.Unmarshal(carnetData, &carnet)
 
-			if !strings.HasSuffix(resolvedHost, ".t2c") {
-				return nil, fmt.Errorf("only .t2c domains are supported")
-			}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		hostPort := req.Host
+		domain := strings.Split(hostPort, ":")[0]
 
-			peerID, err := crypto.ParseT2CAddress(resolvedHost)
-			if err != nil {
-				return nil, err
-			}
+		if !strings.HasSuffix(domain, ".t2c") {
+			http.Error(w, "Proxy T2C: Seuls les domaines .t2c sont supportés", http.StatusForbidden)
+			return
+		}
 
-			// Force local connection for POC if mDNS is slow
-			if localAddrBytes, err := os.ReadFile("data/local_addr.txt"); err == nil {
-				if ma, err := multiaddr.NewMultiaddr(string(localAddrBytes)); err == nil {
-					if pi, err := peer.AddrInfoFromP2pAddr(ma); err == nil {
-						node.Host.Connect(ctx, *pi)
-					}
-				}
-			}
+		pubKeyHash := domain
+		if mapped, ok := carnet[domain]; ok {
+			pubKeyHash = mapped
+		}
+		if !strings.HasSuffix(pubKeyHash, ".t2c") {
+			pubKeyHash = pubKeyHash + ".t2c"
+		}
 
-			// Try to find peer in DHT to discover addresses, but ignore errors
-			// because the peer might already be connected locally via mDNS.
-			pi, err := node.DHT.FindPeer(ctx, peerID)
-			if err == nil {
-				node.Host.Connect(ctx, pi)
-			} else {
-				fmt.Printf("DHT FindPeer failed (might use mDNS or local_addr): %v\n", err)
-			}
-
-			// Create P2P stream
-			stream, err := node.Host.NewStream(ctx, peerID, service.ProtocolID)
-			if err != nil {
-				return nil, err
-			}
-
-			return &streamConn{Stream: stream}, nil
-		},
-	}
-
-	proxy := &httputil.ReverseProxy{
-		Director: func(req *http.Request) {
+		siteDir, err := swarm.SyncSite(req.Context(), node.SwarmManager, node.Host, pubKeyHash)
+		if err == nil {
+			// --- SWARM MODE (Serve from local cache) ---
 			req.URL.Scheme = "http"
 			req.URL.Host = req.Host
-		},
-		Transport: transport,
+			http.FileServer(http.Dir(siteDir)).ServeHTTP(w, req)
+			return
+		}
+
+		// --- DIRECT P2P TUNNEL MODE (Fallback for dynamic services/Git) ---
+		peerID, parseErr := crypto.ParseT2CAddress(pubKeyHash)
+		if parseErr != nil {
+			http.Error(w, "Site Inaccessible: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+
+		// Attempt to resolve peer in DHT
+		pi, _ := node.DHT.FindPeer(req.Context(), peerID)
+		if pi.ID != "" {
+			node.Host.Connect(req.Context(), pi)
+		}
+
+		// --- SELECT ONION ROUTING RELAYS (Brouillage du signal) ---
+		var relays []peer.ID
+		allPeers := node.Host.Network().Peers()
+		for _, p := range allPeers {
+			if p != node.Host.ID() && p != peerID {
+				relays = append(relays, p)
+			}
+		}
+		// Select up to 1 intermediate relay for route masking
+		if len(relays) > 1 {
+			relays = relays[:1]
+		}
+
+		// Open direct tunnel stream via Onion routing (Multi-hop path)
+		stream, dialErr := onion.BuildOnionCircuit(req.Context(), node.Host, peerID, relays)
+		if dialErr != nil {
+			http.Error(w, fmt.Sprintf("Service Inaccessible (Swarm & Direct indisponibles). Swarm: %v, Direct: %v", err, dialErr), http.StatusBadGateway)
+			return
+		}
+		defer stream.Close()
+
+		// Write HTTP request to stream
+		err = req.Write(stream)
+		if err != nil {
+			http.Error(w, "Failed to write request to direct tunnel: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+
+		// Read HTTP response from stream
+		bufReader := bufio.NewReader(stream)
+		resp, err := http.ReadResponse(bufReader, req)
+		if err != nil {
+			http.Error(w, "Failed to read response from direct tunnel: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Copy headers to client response
+		for k, vv := range resp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+
+		// Copy body to client response
+		io.Copy(w, resp.Body)
+	})
+
+	server := &http.Server{
+		Addr:    listenAddr,
+		Handler: handler,
 	}
 
-	fmt.Printf("Starting HTTP Proxy on %s\n", listenAddr)
-	return http.ListenAndServe(listenAddr, proxy)
+	fmt.Printf("🚀 T2C Swarm Gateway running on http://%s\n", listenAddr)
+	return server.ListenAndServe()
 }

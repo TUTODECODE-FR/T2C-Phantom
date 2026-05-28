@@ -83,7 +83,10 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		RelayAddr string `json:"relay_addr"`
+		DisableSeeding bool   `json:"disable_seeding"`
+		UseRelay       bool   `json:"use_relay"`
+		RelayAddr      string `json:"relay_addr"`
+		IsRelay        bool   `json:"is_relay"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
@@ -95,15 +98,35 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	d.cancelNode = cancel
 
-	node, err := p2p.NewNode(ctx, priv, 0, false)
+	// Volunteer Relay Mode: Pass is_relay value to NewNode
+	node, err := p2p.NewNode(ctx, priv, 0, req.IsRelay)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	d.node = node
 
-	if req.RelayAddr != "" {
-		node.ReserveRelay(ctx, req.RelayAddr)
+	// Private Mode (Leech only): Disable seeding if checked
+	node.SwarmManager.DisableSeeding = req.DisableSeeding
+
+	// Relay connection configuration
+	if req.UseRelay {
+		if req.RelayAddr != "" {
+			node.ReserveRelay(ctx, req.RelayAddr)
+		} else {
+			// Connect to public free relays in the P2P community
+			publicRelays := []string{
+				"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfj4YgX94229AoWpRMok3v4nV77YvWkvyC9yK",
+				"/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2mHeqm4479ZJF7M89AgJz3u33u52Hj5kW6hC",
+			}
+			go func() {
+				for _, relay := range publicRelays {
+					if err := node.ReserveRelay(ctx, relay); err == nil {
+						break // successfully reserved a slot on a public relay
+					}
+				}
+			}()
+		}
 	}
 
 	proxyAddr := "127.0.0.1:8080"
