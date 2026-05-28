@@ -15,6 +15,7 @@ const ProtocolID = "/t2c/http/1.0.0"
 
 // ExposeService binds a local TCP port to the P2P network.
 func ExposeService(ctx context.Context, node *p2p.Node, localPort int) error {
+	node.ExitPort = localPort
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
 
 	// Register a stream handler for the T2C protocol

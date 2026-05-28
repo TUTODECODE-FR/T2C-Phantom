@@ -53,3 +53,20 @@ func ParseT2CAddress(addr string) (peer.ID, error) {
 	
 	return peer.IDFromPublicKey(pubKey)
 }
+
+// ParseT2CPublicKey takes a .t2c address and returns the libp2p public key.
+func ParseT2CPublicKey(addr string) (crypto.PubKey, error) {
+	if !strings.HasSuffix(addr, ".t2c") {
+		addr = addr + ".t2c"
+	}
+	
+	encoded := strings.TrimSuffix(addr, ".t2c")
+	encoded = strings.ToUpper(encoded)
+	
+	rawPub, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base32 address: %w", err)
+	}
+	
+	return crypto.UnmarshalEd25519PublicKey(rawPub)
+}
