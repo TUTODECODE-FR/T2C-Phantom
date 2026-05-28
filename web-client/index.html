@@ -3,61 +3,275 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>T2C - Overlay Network</title>
+    <title>T2C · Overlay Network</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
+
+        <!-- ══ SIDEBAR ══════════════════════════════════════ -->
         <nav class="sidebar">
             <div class="logo-area">
                 <div class="logo-icon"></div>
-                <h1>T2C</h1>
-                <span class="badge">Air-Gapped</span>
+                <div class="logo-text">
+                    <span class="logo-name">T2C</span>
+                    <span class="logo-sub">PHANTOM</span>
+                </div>
+                <span class="badge-airgap">AIR-GAPPED</span>
             </div>
+
+            <div class="nav-section-label">NAVIGATION</div>
             <ul class="nav-links">
-                <li class="active" onclick="switchTab('client')">Navigateur Privé</li>
+                <li class="active" onclick="switchTab('client')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                    Navigateur Privé
+                </li>
+                <li onclick="switchTab('about')">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                    Association TUTODECODE
+                </li>
             </ul>
-            <div class="status-indicator">
-                <div class="dot" id="statusDot"></div>
-                <span id="statusText">DÉCONNECTÉ</span>
+
+            <div class="sidebar-footer">
+                <div class="status-indicator" id="statusIndicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <div class="status-info">
+                        <span class="status-label">RÉSEAU</span>
+                        <span class="status-text" id="statusText">DÉCONNECTÉ</span>
+                    </div>
+                </div>
+                <div class="version-tag">v0.1 · Local</div>
             </div>
         </nav>
 
-        <!-- Main Content -->
+        <!-- ══ MAIN CONTENT ═════════════════════════════════ -->
         <main class="content">
-            <!-- Client Tab -->
+
+            <!-- ── TAB : Navigateur Privé ────────────────── -->
             <section id="client-tab" class="tab-content active">
-                <div class="header">
-                    <h2>Navigation Privée P2P</h2>
-                    <p>Naviguez sur le réseau .t2c avec une identité éphémère jetable et un routage masqué.</p>
-                </div>
-                
-                <div class="card glass">
-                    <div class="card-header">
-                        <h3>Lancer le Proxy</h3>
+
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <div class="page-eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            RÉSEAU P2P CHIFFRÉ
+                        </div>
+                        <h2 class="page-title">Navigation Privée</h2>
+                        <p class="page-desc">Identité éphémère jetable · routage masqué · anonymat garanti sur le réseau&nbsp;.t2c</p>
                     </div>
-                    <button class="btn btn-primary glow" id="btnStartClient" onclick="startClient()">Lancer la connexion sécurisée</button>
-                    <button class="btn btn-danger hidden" id="btnStopClient" onclick="stopNode()">Déconnecter & Détruire l'identité</button>
                 </div>
 
-                <div class="info-card hidden" id="clientInfo">
-                    <h3>Bouclier Actif & Anonymat Garanti !</h3>
-                    <p>Votre identité réseau est complètement masquée.</p>
-                    
-                    <div class="search-box mt-4">
-                        <p>Pour naviguer sur le réseau P2P, configurez le proxy de votre navigateur sur <strong>127.0.0.1:8080</strong>, puis tapez n'importe quelle adresse `.t2c` :</p>
-                        <div class="fake-browser-bar">
-                            <span class="lock-icon">🔒</span>
-                            <span class="url-text">http://tutodecode.t2c</span>
+                <!-- Options panel -->
+                <div class="card" id="clientSettingsGroup">
+                    <div class="card-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+                        Options de confidentialité
+                    </div>
+
+                    <div class="options-list">
+
+                        <label class="option-row" for="chkEnableSeeding">
+                            <div class="option-toggle">
+                                <input type="checkbox" id="chkEnableSeeding" checked>
+                                <span class="toggle-visual"></span>
+                            </div>
+                            <div class="option-body">
+                                <span class="option-title">Partage d'hébergement</span>
+                                <span class="option-desc">Stocker et redistribuer temporairement les sites visités pour renforcer le réseau</span>
+                            </div>
+                            <span class="option-badge contrib">CONTRIBUTION</span>
+                        </label>
+
+                        <div class="option-divider"></div>
+
+                        <label class="option-row" for="chkUseRelay" onclick="toggleRelayInput()">
+                            <div class="option-toggle">
+                                <input type="checkbox" id="chkUseRelay">
+                                <span class="toggle-visual"></span>
+                            </div>
+                            <div class="option-body">
+                                <span class="option-title">Masquer mon IP via un Relais</span>
+                                <span class="option-desc">Utiliser un relais public bénévole ou personnalisé pour masquer votre adresse IP réelle</span>
+                            </div>
+                            <span class="option-badge privacy">PRIVÉ</span>
+                        </label>
+
+                        <div class="relay-input-wrapper hidden" id="relayInputWrapper">
+                            <div class="relay-input-inner">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                <input type="text" id="txtRelayAddr" placeholder="multiaddr du relais · ex: /ip4/1.2.3.4/tcp/4001 (vide = relais libp2p auto)">
+                            </div>
+                        </div>
+
+                        <div class="option-divider"></div>
+
+                        <label class="option-row" for="chkIsRelay">
+                            <div class="option-toggle">
+                                <input type="checkbox" id="chkIsRelay">
+                                <span class="toggle-visual"></span>
+                            </div>
+                            <div class="option-body">
+                                <span class="option-title">Devenir Relais Bénévole</span>
+                                <span class="option-desc">Contribuer activement au réseau en relayant le trafic des autres utilisateurs</span>
+                            </div>
+                            <span class="option-badge relay">BÉNÉVOLE</span>
+                        </label>
+
+                    </div>
+
+                    <div class="card-actions">
+                        <button class="btn btn-primary" id="btnStartClient" onclick="startClient()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            Lancer la connexion sécurisée
+                        </button>
+                        <button class="btn btn-danger hidden" id="btnStopClient" onclick="stopNode()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                            Déconnecter & Détruire l'identité
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active connection info -->
+                <div class="info-panel hidden" id="clientInfo">
+                    <div class="info-panel-header">
+                        <div class="info-pulse">
+                            <span class="pulse-ring"></span>
+                            <span class="pulse-core"></span>
+                        </div>
+                        <div>
+                            <div class="info-panel-title">Bouclier Actif · Anonymat Garanti</div>
+                            <div class="info-panel-sub">Votre identité réseau est complètement masquée</div>
+                        </div>
+                    </div>
+
+                    <div class="proxy-instruction">
+                        <div class="proxy-label">CONFIGURATION PROXY NAVIGATEUR</div>
+                        <div class="proxy-detail">
+                            Définissez le proxy HTTP de votre navigateur sur
+                            <code class="proxy-addr">127.0.0.1:8080</code>
+                            puis accédez à n'importe quel domaine <code>.t2c</code>
+                        </div>
+                    </div>
+
+                    <div class="browser-demo">
+                        <div class="browser-bar">
+                            <div class="browser-controls">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <div class="browser-url">
+                                <svg class="lock-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                <span class="url-scheme">http://</span><span class="url-host">tutodecode.t2c</span>
+                            </div>
                         </div>
                     </div>
                 </div>
+
             </section>
 
+            <!-- ── TAB : Association TUTODECODE ──────────── -->
+            <section id="about-tab" class="tab-content">
+
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <div class="page-eyebrow">
+                            <span class="eyebrow-dot accent"></span>
+                            LOI 1901 · SIREN 102 763 133
+                        </div>
+                        <h2 class="page-title">Association TUTODECODE</h2>
+                        <p class="page-desc">Éducation numérique souveraine · liberté technologique · privacy by design</p>
+                    </div>
+                </div>
+
+                <!-- Identity grid -->
+                <div class="card">
+                    <div class="card-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                        Fiche d'identité officielle
+                    </div>
+                    <div class="identity-grid">
+                        <div class="id-item">
+                            <div class="id-label">Nom Légal</div>
+                            <div class="id-value">Assoc. TUTODECODE</div>
+                        </div>
+                        <div class="id-item">
+                            <div class="id-label">Logiciel</div>
+                            <div class="id-value mono">T2DECODE</div>
+                        </div>
+                        <div class="id-item">
+                            <div class="id-label">Statut Juridique</div>
+                            <div class="id-value">Loi 1901 · But non lucratif</div>
+                        </div>
+                        <div class="id-item copyable" onclick="copyToClip('102 763 133', this)">
+                            <div class="id-label">SIREN <span class="copy-hint">cliquer pour copier</span></div>
+                            <div class="id-value mono">102 763 133</div>
+                        </div>
+                        <div class="id-item">
+                            <div class="id-label">Date de Création</div>
+                            <div class="id-value">Mars 2026</div>
+                        </div>
+                        <div class="id-item copyable" onclick="copyToClip('13730 St-Victoret, FR', this)">
+                            <div class="id-label">Siège Social <span class="copy-hint">cliquer pour copier</span></div>
+                            <div class="id-value">13730 St-Victoret, FR</div>
+                        </div>
+                        <div class="id-item">
+                            <div class="id-label">Fondateur</div>
+                            <div class="id-value">Maxime Martin Civet</div>
+                        </div>
+                        <div class="id-item copyable" onclick="copyToClip('contact@tutodecode.org', this)">
+                            <div class="id-label">Contact <span class="copy-hint">cliquer pour copier</span></div>
+                            <div class="id-value mono accent-text">contact@tutodecode.org</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Privacy pills -->
+                <div class="pills-row">
+                    <div class="pill">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 19a10.94 10.94 0 0 1-1.72-9.33M10.71 5.05A10 10 0 0 1 22.56 9M1.42 9a10 10 0 0 1 5.02-5"/></svg>
+                        <div><div class="pill-title">Zéro Réseau</div><div class="pill-sub">Aucune requête sortante</div></div>
+                    </div>
+                    <div class="pill">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        <div><div class="pill-title">Zéro Télémétrie</div><div class="pill-sub">Aucun traceur distant</div></div>
+                    </div>
+                    <div class="pill">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <div><div class="pill-title">Données Locales</div><div class="pill-sub">Tout reste sur votre machine</div></div>
+                    </div>
+                    <div class="pill">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                        <div><div class="pill-title">GPL-3.0</div><div class="pill-sub">Code source auditable</div></div>
+                    </div>
+                </div>
+
+                <!-- JOAFE declaration -->
+                <div class="card">
+                    <div class="card-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        Déclaration Officielle (JOAFE)
+                        <span class="card-badge-verified">✓ DÉCLARÉ</span>
+                    </div>
+                    <p class="card-text">L'Association TUTODECODE est déclarée en préfecture et enregistrée sous le SIREN&nbsp;<strong>102&nbsp;763&nbsp;133</strong>. Sa création a fait l'objet d'une publication au Journal Officiel de la République Française.</p>
+                    <div class="joafe-url-block">
+                        <div class="joafe-url-label">LIEN OFFICIEL JOAFE</div>
+                        <div class="joafe-url-row">
+                            <div class="accent-bar"></div>
+                            <code class="joafe-url">https://www.journal-officiel.gouv.fr/pages/associations-detail-annonce/?q.id=id:202600110336</code>
+                            <button class="copy-btn" onclick="copyToClip('https://www.journal-officiel.gouv.fr/pages/associations-detail-annonce/?q.id=id:202600110336', this)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
         </main>
     </div>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
     <script src="app.js"></script>
 </body>
 </html>
