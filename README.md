@@ -3,7 +3,7 @@
 
   # T2C Phantom
 
-  **« Le savoir ne devrait pas toujours dépendre d'une connexion... ni d'un censeur. »**<br>
+  **« Le savoir ne devrait pas toujours dépendre d'une connexion. »**<br>
   — *Maxime MARTIN CIVET*
 
   [![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E)]()
@@ -71,8 +71,9 @@ La transparence est la fondation de la confiance. Bien que ce code soit protég�
 ## ⚠️ Propriété Intellectuelle
 
 > [!WARNING]
-> Ce code est publié exclusivement à des fins de **transparence** et d'**audit de sécurité**.  
-> **Tous les droits sont réservés.** (Ce n'est PAS de l'Open-Source classique).
+> **T2C-Phantom (le cœur de l'infrastructure réseau), est maintenu sous propriété intellectuelle stricte (Tous droits réservés).**
+
+**L'explication :** C'est une démarche d'auditabilité. J'ouvre publiquement le code source pour garantir une transparence totale, afin que n'importe quel expert puisse vérifier l'absence de failles ou de portes dérobées (backdoors). En revanche, je conserve les droits exclusifs pour empêcher toute récupération commerciale ou la création de réseaux parallèles qui pourraient mettre en danger les utilisateurs. C'est une mesure légale pour garantir l'intégrité et la stabilité de notre infrastructure.
 
 **Ce que vous POUVEZ faire :**
 - ✔️ Lire et auditer le code source pour vérifier l'absence de portes dérobées.
