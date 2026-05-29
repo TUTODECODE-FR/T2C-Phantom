@@ -3,7 +3,7 @@
 
   # T2C Phantom
 
-  **« Le savoir ne devrait pas toujours dépendre d'une connexion... ni d'un censeur. »**<br>
+  **« Le savoir ne devrait pas toujours dépendre d'une connexion. »**<br>
   — *Maxime MARTIN CIVET*
 
   [![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E)]()
