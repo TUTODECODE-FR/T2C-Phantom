@@ -29,7 +29,7 @@
 > L'utilisation, la modification, la distribution ou l'intégration commerciale de ce moteur réseau par des entreprises, gouvernements, ou entités tierces est **formellement interdite** sans accord écrit explicite de TUTODECODE.
 
 **Pourquoi cette protection absolue ? (Transparence Hybride)**
-Nous adoptons une approche hybride pour votre sécurité. La mécanique côté client est auditable pour prouver l'absence de portes dérobées. En revanche, **le code source du Relais et de nos serveurs est gardé strictement confidentiel**. Ce choix fort et assumé empêche les acteurs malveillants d'étudier notre infrastructure pour créer des nœuds empoisonnés (Attaques Sybil) visant à espionner ou détourner le réseau T2C. Votre sécurité repose sur un chiffrement inviolable et sur la confiance envers l'Association.
+Nous adoptons une approche hybride pour la sécurité du réseau. La mécanique côté client est auditable pour prouver l'absence de portes dérobées. En revanche, **le code source du Relais et de nos serveurs est gardé strictement confidentiel**. Ce choix architectural vise à empêcher les acteurs malveillants d'étudier notre infrastructure pour créer des nœuds empoisonnés (Attaques Sybil) et préserver l'intégrité de la topologie du réseau T2C.
 
 - ✔️ **Autorisé** : Lire, auditer, compiler pour un usage personnel et se connecter au réseau T2DECODE.
 - ❌ **Interdit** : Copier le code pour des projets tiers, le revendre, le déployer dans un réseau d'entreprise privé ou institutionnel.
@@ -44,7 +44,7 @@ Pour comprendre T2C Phantom, il faut comprendre notre philosophie : **Le Sous-ma
 T2DECODE est l'application éducative souveraine (Offline-First). Elle fonctionne de manière totalement autonome en local, offrant une interface graphique avec des cours interactifs, des outils, des simulateurs de hacking et une IA locale (Ollama).
 
 ### 2. Le Sous-marin (T2C Phantom)
-Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Il n'est pas obligatoire pour utiliser T2DECODE en local. Cependant, si vous activez l'option de mise à jour automatique, T2C Phantom s'éveille. Son rôle est alors de **connecter des machines qui ne sont pas censées pouvoir se connecter** afin de rapatrier les mises à jour et les nouveaux cours en contournant la censure.
+Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Il n'est pas obligatoire pour utiliser T2DECODE en local. Cependant, si vous activez l'option de mise à jour automatique, T2C Phantom s'éveille. Son rôle est alors de **connecter des machines qui ne sont pas censées pouvoir se connecter** afin de rapatrier les mises à jour et les nouveaux cours en évitant la centralisation (en s'appuyant sur un "GitHub" décentralisé via le réseau P2P de TUTODECODE).
 
 #### A. Le contournement de la censure (DPI Evasion & NAT Traversal)
 Aujourd'hui, les réseaux sont verrouillés (pare-feux d'entreprise, box internet, routeurs stricts). T2C Phantom utilise des techniques d'évasion avancées :
