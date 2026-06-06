@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/TDC.png" width="160" height="160" alt="T2C Logo">
 
-  # T2C Phantom (Client)
+  # T2C Phantom
 
   **« Le savoir ne devrait pas toujours dépendre d'une connexion. »**<br>
   — *Maxime MARTIN CIVET*
