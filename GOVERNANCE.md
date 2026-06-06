@@ -1,7 +1,7 @@
 # Gouvernance du Projet T2C-Phantom
 
 ## 1. Vision et Objectifs
-Le projet **T2C-Phantom** est porté par l'association à but non lucratif **TUTODECODE**. Notre mission est de démocratiser l'apprentissage de la cybersécurité et du développement logiciel à travers des outils open-source, gratuits et respectueux de la vie privée (Offline-First, Zero Cloud).
+Le projet **T2C-Phantom** est porté par l'association à but non lucratif **TUTODECODE**. Notre mission est de démocratiser l'apprentissage de la cybersécurité et du développement logiciel à travers des outils "Source-Available" (Auditable), gratuits, souverains, et respectueux de la vie privée (Offline-First, Zero Cloud).
 
 ## 2. Structure de Gouvernance
 Ce projet suit un modèle de gouvernance du type "Maintainer-led" (dirigé par les mainteneurs), supervisé par le conseil d'administration de l'association TUTODECODE.
