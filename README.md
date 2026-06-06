@@ -74,6 +74,16 @@ Le Dashboard local (`http://127.0.0.1:9090`) a été entièrement repensé avec 
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
+## 🔐 Conformité & Sécurité
+
+La transparence est la fondation de la confiance. Bien que ce code soit protégé par le droit de la propriété intellectuelle, nous l'ouvrons publiquement à l'audit.
+
+- 🛡️ **Politique de Sécurité** : Consultez notre [SECURITY.md](SECURITY.md) pour notre approche des failles critiques.
+- 📜 **Code de Conduite** : Nous appliquons le [Contributor Covenant 2.1](CODE_OF_CONDUCT.md).
+- ⚖️ **Gouvernance** : Découvrez comment nous gérons le projet dans le [GOVERNANCE.md](GOVERNANCE.md).
+
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
 ## 🏛️ L'Association TUTODECODE
 
 Le projet est propulsé par l'**Association TUTODECODE** (Économie Sociale et Solidaire).  
