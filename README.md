@@ -41,10 +41,10 @@ Nous adoptons une approche hybride pour votre sécurité. La mécanique côté c
 Pour comprendre T2C Phantom, il faut comprendre notre philosophie : **Le Sous-marin et la Vitrine**.
 
 ### 1. La Vitrine (T2DECODE)
-T2DECODE est l'application éducative visible par l'utilisateur. Elle contient l'IA locale (Ollama), les simulateurs de hacking, les cours interactifs et l'interface graphique.
+T2DECODE est l'application éducative souveraine (Offline-First). Elle fonctionne de manière totalement autonome en local, offrant une interface graphique avec des cours interactifs, des outils, des simulateurs de hacking et une IA locale (Ollama).
 
 ### 2. Le Sous-marin (T2C Phantom)
-Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Son rôle est unique : **connecter des machines qui ne sont pas censées pouvoir se connecter.**
+Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Il n'est pas obligatoire pour utiliser T2DECODE en local. Cependant, si vous activez l'option de mise à jour automatique, T2C Phantom s'éveille. Son rôle est alors de **connecter des machines qui ne sont pas censées pouvoir se connecter** afin de rapatrier les mises à jour et les nouveaux cours en contournant la censure.
 
 #### A. Le contournement de la censure (DPI Evasion & NAT Traversal)
 Aujourd'hui, les réseaux sont verrouillés (pare-feux d'entreprise, box internet, routeurs stricts). T2C Phantom utilise des techniques d'évasion avancées :
