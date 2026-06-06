@@ -64,17 +64,37 @@ Pour faciliter l'usage humain, T2C utilise un fichier local `carnet.json` agissa
 
 ## 🚀 Installation Plug & Play
 
-Oubliez les configurations complexes ! Rendez-vous dans la section **Releases** de ce dépôt et exécutez le script adapté à votre plateforme en 1 clic :
-
-- 🪟 **Windows** : Double-cliquez sur `install_windows.bat`
-- 🍎 **macOS / 🐧 Linux** : Exécutez le script shell approprié.
-- 📱 **Android** : La librairie native `t2c-android.aar` s'intègre directement à l'APK T2DECODE.
+Oubliez les configurations complexes ! Rendez-vous dans la section **Releases** de ce dépôt et téléchargez l'exécutable pour votre plateforme.
 
 ### ⚙️ Sous le capot (En 3 secondes chrono)
 1. ✅ **Déploiement Automatique** : Téléchargement du binaire Go ultra-léger pour votre architecture.
 2. ✅ **Bootstrapping DHT** : Récupération automatique du fichier `carnet.json` (l'annuaire décentralisé P2P).
 3. ✅ **Connexion Furtive** : Établissement du tunnel chiffré via notre technologie Circuit Relay v2 (NAT/DPI Traversal).
-4. ✅ **Lancement** : Ouverture automatique du Dashboard de contrôle sur **http://127.0.0.1:9090**.
+
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
+## 💻 Comment Utiliser T2C Phantom ?
+
+Une fois le binaire téléchargé, ouvrez votre terminal (ou invite de commande) dans le dossier du programme.
+
+### 1. Lancer le tunnel furtif (Le Proxy Local)
+Pour percer un pare-feu d'entreprise ou de réseau public, exécutez la commande suivante. Elle ouvre un proxy local (sur le port 8080) et masque votre trafic via le Relais Azure :
+```bash
+# Sur Mac/Linux :
+./t2c start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
+
+# Sur Windows :
+t2c.exe start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
+```
+
+### 2. Naviguer sur le réseau "Fantôme"
+Laissez le terminal ouvert. Dans un autre terminal, ou dans la configuration proxy de votre navigateur, vous pouvez maintenant accéder aux sites P2P cachés (les adresses `.t2c`) !
+
+Si vous possédez le fichier `carnet.json` fourni (qui agit comme un annuaire DNS), vous pouvez taper directement les noms lisibles :
+```bash
+curl -x http://localhost:8080 http://tutodecode.t2c
+```
+*Le trafic passera de votre ordinateur, au Relais Azure chiffré (pour esquiver la censure), jusqu'au serveur privé de destination (Le "Sous-marin").*
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
