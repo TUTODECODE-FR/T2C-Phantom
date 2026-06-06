@@ -74,7 +74,7 @@ async function fetchStatus() {
 /* ── Start client ─────────────────────────────────────────── */
 async function startClient() {
     const btn = document.getElementById('btnStartClient');
-    btn.textContent = 'Connexion…';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Connexion…';
     btn.disabled = true;
 
     const enableSeeding = document.getElementById('chkEnableSeeding').checked;
@@ -95,7 +95,7 @@ async function startClient() {
         });
     } catch { /* ignore */ }
 
-    btn.textContent = 'Lancer la connexion sécurisée';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Lancer la connexion sécurisée';
     btn.disabled = false;
     fetchStatus();
 }
