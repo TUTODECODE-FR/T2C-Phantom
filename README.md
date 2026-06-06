@@ -50,10 +50,10 @@ T2DECODE est l'application éducative souveraine (Offline-First). Elle fonctionn
 ### 2. Le Sous-marin (T2C Phantom)
 Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Il n'est pas obligatoire pour utiliser T2DECODE en local. Cependant, si vous activez l'option de mise à jour automatique, T2C Phantom s'éveille. Son rôle est de **vous connecter furtivement au réseau P2P de TUTODECODE**. Cela permet à l'application de télécharger automatiquement les nouveaux cours (fini les vérifications manuelles à 4h du matin pour voir s'il y a du nouveau !). Dans le futur, ce réseau hébergera également un forum de discussion 100% décentralisé.
 
-#### A. Le contournement de la censure (DPI Evasion & NAT Traversal)
-Aujourd'hui, les réseaux sont verrouillés (pare-feux d'entreprise, box internet, routeurs stricts). T2C Phantom utilise des techniques d'évasion avancées :
-- **Circuit Relay v2** : Si deux ordinateurs sont bloqués par un pare-feu, ils se rejoignent sur un Relais public Azure.
-- **WebSocket Secure (WSS)** : Pour passer les pare-feux Deep Packet Inspection (DPI) très agressifs, T2C Phantom déguise le trafic P2P en trafic web HTTPS standard (Port 443). Le pare-feu n'y voit que du feu.
+#### A. Connectivité en milieux restreints (NAT Traversal & WSS)
+Dans certains environnements (universités, réseaux stricts), les configurations réseau bloquent par défaut les protocoles de communication Pair-à-Pair. Pour garantir un accès continu aux ressources éducatives, T2C Phantom utilise des techniques de routage standardisées :
+- **Circuit Relay v2** : Permet à deux ordinateurs situés derrière des routeurs stricts d'établir une connexion en se rejoignant sur un nœud Relais public.
+- **WebSocket Secure (WSS)** : T2C Phantom encapsule légitimement son trafic P2P à l'intérieur d'un flux HTTPS standard (Port 443). Cela assure une compatibilité maximale avec les équipements réseau (DPI), permettant au trafic éducatif de circuler de manière fluide et sécurisée, à l'instar d'une navigation web classique.
 
 #### B. Le "Chiffrement Emboîté" (Sécurité absolue)
 T2C Phantom utilise un modèle Zero-Trust. Même si le trafic passe par notre Relais Azure, **Microsoft ne peut rien lire**.
