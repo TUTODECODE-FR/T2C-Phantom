@@ -28,8 +28,8 @@
 > Le code de T2C Phantom est maintenu sous propriété intellectuelle stricte (**Tous droits réservés**). 
 > L'utilisation, la modification, la distribution ou l'intégration commerciale de ce moteur réseau par des entreprises, gouvernements, ou entités tierces est **formellement interdite** sans accord écrit explicite de TUTODECODE.
 
-**Pourquoi cette protection absolue ?**
-Nous ouvrons ce code pour garantir une **transparence totale**. N'importe quel expert en cybersécurité peut auditer ce client pour s'assurer de l'absence de portes dérobées (backdoors) et de l'intégrité du chiffrement. Cependant, l'architecture réseau développée ici a nécessité une R&D massive pour traverser les pare-feux et censures les plus extrêmes. Cette licence vise à empêcher le vol industriel par de grandes entreprises technologiques tout en protégeant les utilisateurs d'infrastructures frauduleuses clonées.
+**Pourquoi cette protection absolue ? (Transparence Hybride)**
+Nous adoptons une approche hybride pour votre sécurité. La mécanique côté client est auditable pour prouver l'absence de portes dérobées. En revanche, **le code source du Relais et de nos serveurs est gardé strictement confidentiel**. Ce choix fort et assumé empêche les acteurs malveillants d'étudier notre infrastructure pour créer des nœuds empoisonnés (Attaques Sybil) visant à espionner ou détourner le réseau T2C. Votre sécurité repose sur un chiffrement inviolable et sur la confiance envers l'Association.
 
 - ✔️ **Autorisé** : Lire, auditer, compiler pour un usage personnel et se connecter au réseau T2DECODE.
 - ❌ **Interdit** : Copier le code pour des projets tiers, le revendre, le déployer dans un réseau d'entreprise privé ou institutionnel.
