@@ -32,19 +32,33 @@
 Nous ouvrons ce code pour garantir une **transparence totale**. N'importe quel expert en cybersécurité peut auditer ce client pour s'assurer de l'absence de portes dérobées (backdoors) et de l'intégrité du chiffrement. Cependant, l'architecture réseau développée ici a nécessité une R&D massive pour traverser les pare-feux et censures les plus extrêmes. Cette licence vise à empêcher le vol industriel par de grandes entreprises technologiques tout en protégeant les utilisateurs d'infrastructures frauduleuses clonées.
 
 - ✔️ **Autorisé** : Lire, auditer, compiler pour un usage personnel et se connecter au réseau T2DECODE.
-- ❌ **Interdit** : Copier le code pour des projets tiers, le revendre, le déployer dans un réseau d'entreprise privé.
+- ❌ **Interdit** : Copier le code pour des projets tiers, le revendre, le déployer dans un réseau d'entreprise privé ou institutionnel.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🎯 Le Concept : "Le Sous-marin et la Vitrine"
+## 🧠 Comment ça fonctionne ? (L'Architecture T2C)
 
-L'écosystème **TUTODECODE** est divisé en deux entités distinctes pour une sécurité maximale :
+Pour comprendre T2C Phantom, il faut comprendre notre philosophie : **Le Sous-marin et la Vitrine**.
 
-1. **T2DECODE (La Vitrine)** : L'application éducative visuelle. Elle contient l'IA locale (Ollama), les simulateurs de hacking, les cours interactifs et l'interface utilisateur.
-2. **T2C Phantom (Le Sous-marin)** : Ce dépôt. C'est un moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan.
+### 1. La Vitrine (T2DECODE)
+T2DECODE est l'application éducative visible par l'utilisateur. Elle contient l'IA locale (Ollama), les simulateurs de hacking, les cours interactifs et l'interface graphique.
 
-**Le rôle de ce Client T2C Phantom :**
-Si l'application T2DECODE a besoin de télécharger des mises à jour, des cours ou de discuter en Peer-to-Peer, elle passe par T2C Phantom. Phantom se charge alors de contourner la censure de votre réseau (via TCP natif, WebSocket ou QUIC), de trouver d'autres pairs de manière décentralisée (Kademlia DHT) et de rapatrier les données cryptées en essaim (Swarm).
+### 2. Le Sous-marin (T2C Phantom)
+Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Son rôle est unique : **connecter des machines qui ne sont pas censées pouvoir se connecter.**
+
+#### A. Le contournement de la censure (DPI Evasion & NAT Traversal)
+Aujourd'hui, les réseaux sont verrouillés (pare-feux d'entreprise, box internet, routeurs stricts). T2C Phantom utilise des techniques d'évasion avancées :
+- **Circuit Relay v2** : Si deux ordinateurs sont bloqués par un pare-feu, ils se rejoignent sur un Relais public Azure.
+- **WebSocket Secure (WSS)** : Pour passer les pare-feux Deep Packet Inspection (DPI) très agressifs, T2C Phantom déguise le trafic P2P en trafic web HTTPS standard (Port 443). Le pare-feu n'y voit que du feu.
+
+#### B. Le "Chiffrement Emboîté" (Sécurité absolue)
+T2C Phantom utilise un modèle Zero-Trust. Même si le trafic passe par notre Relais Azure, **Microsoft ne peut rien lire**.
+1. **La couche externe (HTTPS)** : Le pare-feu voit un trafic web sécurisé.
+2. **La couche interne (Protocole Noise)** : Les données à l'intérieur du tunnel HTTPS sont chiffrées une seconde fois de bout-en-bout avec des clés privées générées uniquement sur votre machine. Le Relais Azure n'est qu'un "tuyau opaque".
+
+#### C. Annuaire Décentralisé (Kademlia DHT)
+Il n'y a **aucun serveur central** qui liste les sites. Pour trouver un pair, T2C Phantom interroge le réseau mondial (DHT). 
+Pour faciliter l'usage humain, T2C utilise un fichier local `carnet.json` agissant comme un résolveur DNS décentralisé (ex: `tutodecode.t2c` -> `izm3xft3...t2c`).
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -78,7 +92,7 @@ Le Dashboard local (`http://127.0.0.1:9090`) a été entièrement repensé avec 
 
 La transparence est la fondation de la confiance. Bien que ce code soit protégé par le droit de la propriété intellectuelle, nous l'ouvrons publiquement à l'audit.
 
-- 🛡️ **Politique de Sécurité** : Consultez notre [SECURITY.md](SECURITY.md) pour notre approche des failles critiques.
+- 🛡️ **Politique de Sécurité et Modèle de Menace** : Consultez notre [SECURITY.md](SECURITY.md) pour comprendre de quoi (et de qui) T2C Phantom vous protège.
 - 📜 **Code de Conduite** : Nous appliquons le [Contributor Covenant 2.1](CODE_OF_CONDUCT.md).
 - ⚖️ **Gouvernance** : Découvrez comment nous gérons le projet dans le [GOVERNANCE.md](GOVERNANCE.md).
 
