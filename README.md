@@ -21,6 +21,10 @@
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
+> [!WARNING]
+> **⚠️ Avertissement Légal & Éthique**
+> T2C Phantom est un réseau P2P éducatif géré par l'association TUTODECODE. Son but est de garantir l'accès à la connaissance en s'affranchissant de la centralisation (en hébergeant un registre de paquets décentralisé). **T2C Phantom n'est PAS un outil conçu pour contourner illégalement des systèmes de sécurité ni pour être utilisé à des fins illégales.**
+
 ## ⚠️ PROPRIÉTÉ INTELLECTUELLE & LICENCE STRICTE
 
 > [!CAUTION]
@@ -44,7 +48,7 @@ Pour comprendre T2C Phantom, il faut comprendre notre philosophie : **Le Sous-ma
 T2DECODE est l'application éducative souveraine (Offline-First). Elle fonctionne de manière totalement autonome en local, offrant une interface graphique avec des cours interactifs, des outils, des simulateurs de hacking et une IA locale (Ollama).
 
 ### 2. Le Sous-marin (T2C Phantom)
-Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Il n'est pas obligatoire pour utiliser T2DECODE en local. Cependant, si vous activez l'option de mise à jour automatique, T2C Phantom s'éveille. Son rôle est alors de **connecter des machines qui ne sont pas censées pouvoir se connecter** afin de rapatrier les mises à jour et les nouveaux cours en évitant la centralisation (en s'appuyant sur un "GitHub" décentralisé via le réseau P2P de TUTODECODE).
+Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Il n'est pas obligatoire pour utiliser T2DECODE en local. Cependant, si vous activez l'option de mise à jour automatique, T2C Phantom s'éveille. Son rôle est de **vous connecter furtivement au réseau P2P de TUTODECODE**. Cela permet à l'application de télécharger automatiquement les nouveaux cours (fini les vérifications manuelles à 4h du matin pour voir s'il y a du nouveau !). Dans le futur, ce réseau hébergera également un forum de discussion 100% décentralisé.
 
 #### A. Le contournement de la censure (DPI Evasion & NAT Traversal)
 Aujourd'hui, les réseaux sont verrouillés (pare-feux d'entreprise, box internet, routeurs stricts). T2C Phantom utilise des techniques d'évasion avancées :
