@@ -1,6 +1,6 @@
 module t2c
 
-go 1.26.0
+go 1.26.4
 
 require (
 	github.com/ipfs/go-cid v0.6.1
