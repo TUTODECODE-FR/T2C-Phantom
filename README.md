@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/phantom_logo.png" width="160" height="160" alt="T2C Phantom Logo">
+  <img src="assets/phantom_logo.png" width="160" height="160" style="border-radius: 32px;" alt="T2C Phantom Logo">
 
   # T2C Phantom
 
