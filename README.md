@@ -43,14 +43,24 @@ T2C Phantom repose sur un modèle d'architecture décentralisée (Swarm/Mesh) ga
 
 ### Schéma Conceptuel
 
-```mermaid
-graph TD
-    Client[T2DECODE App] -->|Requêtes Locales| T2C(T2C Phantom Daemon)
-    T2C -->|Tunnel WSS| Relay((Relais Public Officiel))
-    Relay -->|Routage aveugle| PeerA(Pair A)
-    Relay -->|Routage aveugle| PeerB(Pair B)
-    PeerA -.->|Synchronisation| DHT{Kademlia DHT}
-    PeerB -.->|Synchronisation| DHT
+```text
+       Client T2DECODE
+              │
+              ▼ (Requêtes HTTP/SOCKS5 Locales)
+     ┌─────────────────┐
+     │   T2C Phantom   │
+     │    (Daemon)     │
+     └────────┬────────┘
+              │
+              ▼ (Tunnel WSS - Port 443)
+       Relais Public
+       (Routeur Aveugle)
+         /         \
+        /           \
+  Pair A             Pair B
+       \             /
+        \           /
+       Kademlia DHT (Annuaire)
 ```
 
 ### Principes Clés
@@ -77,6 +87,8 @@ La transparence est la fondation de la confiance. Voici une évaluation réalist
 ## 📊 Métriques Techniques (Estimations)
 
 T2C Phantom a été conçu pour l'efficacité et la légèreté, afin de tourner en tâche de fond sans perturber le poste utilisateur.
+
+*(Mesuré sur Ubuntu 24.04 / Ryzen 5 / Go 1.26)*
 
 - **Empreinte mémoire (RAM)** : ~25 Mo en fonctionnement normal.
 - **Temps de démarrage (Bootstrapping)** : ~3 secondes.
@@ -123,6 +135,26 @@ Absolument. T2DECODE est une application "Offline-First". T2C Phantom est unique
 
 **4. Puis-je héberger mon propre relais ?**  
 Actuellement, le réseau s'appuie sur des relais de confiance pour éviter la pollution de la table DHT. L'hébergement communautaire non vérifié n'est pas encore supporté.
+
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
+## 🗺️ Roadmap (Feuille de Route)
+
+Le protocole évolue pour offrir une résilience encore plus forte face à la censure.
+
+```text
+v1.2 (En cours)
+- Support Multi-relay (Failover automatique si le relais principal est inaccessible).
+- Mode Stealth (Obfuscation avancée des paquets Noise).
+
+v1.3
+- Fédération de relais.
+- Mécanisme de réputation des pairs (Anti-Spam DHT).
+
+v1.4
+- Community relay (Outil CLI simplifié pour héberger son propre relais certifié).
+- Bridging avec le réseau local (Mesh hybride LAN/WAN).
+```
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
