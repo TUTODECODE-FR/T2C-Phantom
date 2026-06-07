@@ -177,12 +177,17 @@ v1.4
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🏛️ L'Association TUTODECODE
-Le projet est propulsé par l'**Association TUTODECODE** (Économie Sociale et Solidaire).  
-Notre but : Démocratiser l'informatique souveraine, la cybersécurité, et l'apprentissage respectueux de la vie privée.
+## 🏛️ L'Association TUTODECODE (Mentions Légales)
 
-- 🌐 **Site Web** : [tutodecode.org](https://tutodecode.org)
-- ☕ **Soutenez-nous** : [Faire un don via HelloAsso](https://www.helloasso.com/associations/tutodecode)
+Le projet T2DECODE est développé et soutenu par l'**Association TUTODECODE**, structure relevant de l'Économie Sociale et Solidaire (ESS).  
+Notre mission est de démocratiser la maîtrise des infrastructures informatiques et de la cybersécurité en fournissant des outils souverains et respectueux de la vie privée.
+
+- **Éditeur** : Association Loi 1901 TUTO DECODE
+- **Directeur de Publication** : Maxime MARTIN CIVET
+- **SIREN** : 102 763 133
+- **Site Web Officiel** : [https://tutodecode.org](https://tutodecode.org)
+- **Preuve Légale** : [Annonce de création parue au JOAFE](https://www.journal-officiel.gouv.fr/pages/associations-detail-annonce/?q.id=id:202600110336)
+- **Engagement de Confidentialité** : [Consulter notre Politique RGPD](RGPD.md)
 
 ---
 <div align="center">
