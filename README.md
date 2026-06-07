@@ -40,65 +40,50 @@ Nous adoptons une approche hybride pour la sécurité du réseau. La mécanique 
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🧠 Comment ça fonctionne ? (L'Architecture T2C)
+## 🧠 L'Architecture P2P & Modèle Théorique
 
-Pour comprendre T2C Phantom, il faut comprendre notre philosophie : **Le Sous-marin et la Vitrine**.
+T2C Phantom repose sur un modèle d'architecture décentralisée (Swarm/Mesh) garantissant l'accès à la connaissance sans point de défaillance unique. 
 
-### 1. La Vitrine (T2DECODE)
-T2DECODE est l'application éducative souveraine (Offline-First). Elle fonctionne de manière totalement autonome en local, offrant une interface graphique avec des cours interactifs, des outils, des simulateurs de hacking et une IA locale (Ollama).
+### 1. Le Modèle "Swarm" (Essaim)
+Contrairement à une architecture Client-Serveur classique où tout le monde se connecte à un serveur central vulnérable (Cloud), T2C Phantom crée un **maillage**. Chaque utilisateur qui lance le daemon devient un "nœud" du réseau. L'application *T2DECODE* utilise silencieusement ce réseau en arrière-plan pour interroger l'essaim et télécharger les nouveaux cours disponibles de manière chiffrée. Plus il y a de nœuds, plus le réseau est rapide et résilient.
 
-### 2. Le Sous-marin (T2C Phantom)
-Ce dépôt. C'est le moteur réseau `libp2p` en Go qui tourne silencieusement en arrière-plan. Il n'est pas obligatoire pour utiliser T2DECODE en local. Cependant, si vous activez l'option de mise à jour automatique, T2C Phantom s'éveille. Son rôle est de **vous connecter furtivement au réseau P2P de TUTODECODE**. Cela permet à l'application de télécharger automatiquement les nouveaux cours (fini les vérifications manuelles à 4h du matin pour voir s'il y a du nouveau !). Dans le futur, ce réseau hébergera également un forum de discussion 100% décentralisé.
+### 2. Résilience en Milieux Restreints (DPI Evasion & WSS)
+Pour garantir un accès continu dans les environnements restrictifs (pare-feux d'entreprises, réseaux universitaires, zones censurées), T2C Phantom utilise des techniques d'évasion de pointe :
+- **Circuit Relay v2** : Permet de contourner les restrictions NAT en s'appuyant sur des nœuds relais communautaires pour faire transiter le trafic de manière anonyme.
+- **WebSocket Secure (WSS)** : T2C Phantom encapsule son protocole P2P binaire à l'intérieur d'un flux HTTPS standard (Port 443). Pour les équipements d'inspection (DPI), le trafic ressemble à une navigation web chiffrée classique, le rendant intraçable et impossible à bloquer sans couper tout le trafic HTTPS.
 
-#### A. Connectivité en milieux restreints (NAT Traversal & WSS)
-Dans certains environnements (universités, réseaux stricts), les configurations réseau bloquent par défaut les protocoles de communication Pair-à-Pair. Pour garantir un accès continu aux ressources éducatives, T2C Phantom utilise des techniques de routage standardisées :
-- **Circuit Relay v2** : Permet à deux ordinateurs situés derrière des routeurs stricts d'établir une connexion en se rejoignant sur un nœud Relais public.
-- **WebSocket Secure (WSS)** : T2C Phantom encapsule légitimement son trafic P2P à l'intérieur d'un flux HTTPS standard (Port 443). Cela assure une compatibilité maximale avec les équipements réseau (DPI), permettant au trafic éducatif de circuler de manière fluide et sécurisée, à l'instar d'une navigation web classique.
+### 3. "Chiffrement Emboîté" (Zero-Trust)
+Le réseau applique un chiffrement absolu de bout-en-bout (Protocole Noise / AES-GCM). Même si le trafic transite par des nœuds relais, ceux-ci n'ont aucun accès au contenu. Ils agissent comme des routeurs aveugles.
 
-#### B. Le "Chiffrement Emboîté" (Sécurité absolue)
-T2C Phantom utilise un modèle Zero-Trust. Même si le trafic passe par notre Relais Azure, **Microsoft ne peut rien lire**.
-1. **La couche externe (HTTPS)** : Le pare-feu voit un trafic web sécurisé.
-2. **La couche interne (Protocole Noise)** : Les données à l'intérieur du tunnel HTTPS sont chiffrées une seconde fois de bout-en-bout avec des clés privées générées uniquement sur votre machine. Le Relais Azure n'est qu'un "tuyau opaque".
-
-#### C. Annuaire Décentralisé (Kademlia DHT)
-Il n'y a **aucun serveur central** qui liste les sites. Pour trouver un pair, T2C Phantom interroge le réseau mondial (DHT). 
-Pour faciliter l'usage humain, T2C utilise un fichier local `carnet.json` agissant comme un résolveur DNS décentralisé (ex: `tutodecode.t2c` -> `izm3xft3...t2c`).
+### 4. Annuaire Décentralisé (Kademlia DHT)
+Il n'y a **aucun serveur central d'adressage**. Pour localiser les données, le réseau interroge une table de hachage distribuée (DHT) mondiale. Pour l'expérience utilisateur, T2C Phantom intègre un résolveur DNS décentralisé (le fichier `carnet.json`), permettant de traduire des noms humains (ex: `tutodecode.t2c`) en adresses cryptographiques.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🚀 Installation Plug & Play
+## 🚀 Guide Rapide : Post-Téléchargement
 
-Oubliez les configurations complexes ! Rendez-vous dans la section **Releases** de ce dépôt et téléchargez l'exécutable pour votre plateforme.
+Le binaire est conçu pour être 100% autonome et sans dépendances (Air-Gapped ready). Une fois téléchargé depuis la section **Releases**, voici comment l'utiliser :
 
-### ⚙️ Sous le capot (En 3 secondes chrono)
-1. ✅ **Déploiement Automatique** : Téléchargement du binaire Go ultra-léger pour votre architecture.
-2. ✅ **Bootstrapping DHT** : Récupération automatique du fichier `carnet.json` (l'annuaire décentralisé P2P).
-3. ✅ **Connexion Furtive** : Établissement du tunnel chiffré via notre technologie Circuit Relay v2 (NAT/DPI Traversal).
+### 1. Démarrer le Nœud Local
+Ouvrez votre terminal dans le dossier contenant l'exécutable et lancez le démon en spécifiant un port proxy. Pour traverser des réseaux hostiles, vous pouvez vous masquer derrière un relais cryptographique de confiance.
 
-<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
-
-## 💻 Comment Utiliser T2C Phantom ?
-
-Une fois le binaire téléchargé, ouvrez votre terminal (ou invite de commande) dans le dossier du programme.
-
-### 1. Lancer le tunnel furtif (Le Proxy Local)
-Pour percer un pare-feu d'entreprise ou de réseau public, exécutez la commande suivante. Elle ouvre un proxy local (sur le port 8080) et masque votre trafic via le Relais Azure :
 ```bash
 # Sur Mac/Linux :
-./t2c start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
+./t2c start --proxy 8080 --use-relay /ip4/<VOTRE_RELAIS>/tcp/443/wss/p2p/<PEER_ID>
 
 # Sur Windows :
-t2c.exe start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
+t2c.exe start --proxy 8080 --use-relay /ip4/<VOTRE_RELAIS>/tcp/443/wss/p2p/<PEER_ID>
 ```
+*Le nœud démarrera instantanément, générera une identité éphémère (si aucune clé n'est fournie), et se connectera silencieusement à l'essaim P2P.*
 
 ### 2. Naviguer sur le réseau "Fantôme"
-Laissez le terminal ouvert. Dans un autre terminal, ou dans la configuration proxy de votre navigateur, vous pouvez maintenant accéder aux sites P2P cachés (les adresses `.t2c`) !
+Laissez le terminal tourner en arrière-plan. Votre machine dispose désormais d'un accès au sous-réseau T2C via le proxy local `127.0.0.1:8080`. 
 
-Si vous possédez le fichier `carnet.json` fourni (qui agit comme un annuaire DNS), vous pouvez taper directement les noms lisibles :
+Si vous disposez du fichier `carnet.json` agissant comme annuaire DNS, vous pouvez interroger les nœuds du réseau de manière transparente :
 ```bash
 curl -x http://localhost:8080 http://tutodecode.t2c
 ```
-*Le trafic passera de votre ordinateur, au Relais Azure chiffré (pour esquiver la censure), jusqu'au serveur privé de destination (Le "Sous-marin").*
+*Le trafic traversera vos pare-feux locaux de manière chiffrée, rebondira sur le relais, et atteindra sa destination P2P de manière intraçable.*
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
