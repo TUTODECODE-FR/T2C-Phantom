@@ -43,30 +43,38 @@ T2C Phantom repose sur un modèle d'architecture décentralisée (Swarm/Mesh) ga
 
 ### Schéma Conceptuel
 
-```text
-       Client T2DECODE
-              │
-              ▼ (Requêtes HTTP/SOCKS5 Locales)
-     ┌─────────────────┐
-     │   T2C Phantom   │
-     │    (Daemon)     │
-     └────────┬────────┘
-              │
-              ▼ (Tunnel WSS - Port 443)
-       Relais Public
-       (Routeur Aveugle)
-         /         \
-        /           \
-  Pair A             Pair B
-       \             /
-        \           /
-       Kademlia DHT (Annuaire)
+```mermaid
+flowchart TD
+    classDef client fill:#F5EBDA,stroke:#1A1D2E,stroke-width:2px,color:#1A1D2E;
+    classDef daemon fill:#1A1D2E,stroke:#3DDC84,stroke-width:2px,color:#F5EBDA;
+    classDef relay fill:#D93025,stroke:#1A1D2E,stroke-width:2px,color:#F5EBDA;
+    classDef peer fill:#0078D6,stroke:#1A1D2E,stroke-width:2px,color:#F5EBDA;
+    classDef dht fill:#FCC624,stroke:#1A1D2E,stroke-width:2px,color:#1A1D2E;
+
+    C["💻 Client T2DECODE"]:::client -->|Requêtes Locales| D["⚙️ T2C Phantom Daemon"]:::daemon
+    D -->|Tunnel WSS 443| R(("🌐 Relais Public\n(Routeur Aveugle)")):::relay
+    R -->|Routage| P1["🖥️ Pair A"]:::peer
+    R -->|Routage| P2["🖥️ Pair B"]:::peer
+    P1 -.->|Sync| DHT{"🗂️ Kademlia DHT\n(Annuaire)"}:::dht
+    P2 -.->|Sync| DHT
 ```
 
 ### Principes Clés
 - **Résilience en Milieux Restreints** : Le trafic est encapsulé dans WSS (HTTPS/TLS sur le port 443), ce qui améliore la résilience face à certains systèmes de filtrage DPI (Deep Packet Inspection) en simulant une navigation web standard.
 - **Chiffrement Emboîté (Zero-Trust)** : Le réseau applique un chiffrement de bout-en-bout (Protocole Noise / AES-GCM). Même si le trafic transite par des relais publics, ceux-ci n'ont accès ni à la clé ni aux données.
 - **Annuaire Décentralisé (Kademlia DHT)** : Il n'y a aucun serveur d'adressage. La résolution de noms (ex: `tutodecode.t2c` -> Peer ID) s'effectue via un résolveur DNS local basé sur le fichier `carnet.json`.
+
+<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
+
+### 🔒 Primitives Cryptographiques
+
+| Élément | Technologie | Rôle |
+|----------|-------------|------|
+| **Transport** | TLS 1.3 (WSS) | Encapsulation et contournement DPI |
+| **Session** | Protocole Noise | Négociation des clés (Handshake) |
+| **Chiffrement** | AES-256-GCM | Confidentialité des paquets (AEAD) |
+| **Identité** | Ed25519 | Signatures et authentification des nœuds |
+| **Découverte**| Kademlia DHT | Annuaire réseau décentralisé |
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -82,13 +90,24 @@ La transparence est la fondation de la confiance. Voici une évaluation réalist
 | **Attaque étatique ciblée** | ❌ Non | Le protocole n'est pas conçu pour résister à des acteurs étatiques dédiés (NSA, etc.). Ce n'est pas un outil de dissidence. |
 | **Compromission du poste client** | ❌ Non | Si l'OS de l'utilisateur est infecté (malware, keylogger), le chiffrement réseau devient inutile. |
 
+### 🛑 Limites Connues
+
+Pour une sécurité optimale, il est crucial de comprendre ce que T2C Phantom **ne fait pas** :
+
+- **Ne protège pas contre un poste compromis** : Si votre système d'exploitation est infecté, le chiffrement du réseau devient inefficace.
+- **Ne remplace pas Tor** : Ce n'est pas un outil d'anonymat absolu. L'adresse IP de votre machine est techniquement visible par le relais auquel vous vous connectez.
+- **Ne garantit pas l'anonymat total** : Le but est la confidentialité des données (chiffrement) et le contournement de la censure locale, pas le masquage de l'émetteur.
+- **Peut être bloqué par une inspection TLS avancée** : Si un pare-feu d'entreprise déchiffre le trafic TLS avec un certificat Root d'entreprise injecté de force, la connexion sera interrompue.
+
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
 ## 📊 Métriques Techniques (Estimations)
 
 T2C Phantom a été conçu pour l'efficacité et la légèreté, afin de tourner en tâche de fond sans perturber le poste utilisateur.
 
-*(Mesuré sur Ubuntu 24.04 / Ryzen 5 / Go 1.26)*
+> **Benchmark reproductible :**
+> `go test -bench . -benchmem`
+> *Tests réalisés sur : Ubuntu 24.04 / Ryzen 5 5600G / 16 Go RAM / Go 1.26*
 
 - **Empreinte mémoire (RAM)** : ~25 Mo en fonctionnement normal.
 - **Temps de démarrage (Bootstrapping)** : ~3 secondes.
