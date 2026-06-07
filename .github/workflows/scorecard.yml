@@ -18,6 +18,10 @@ jobs:
       id-token: write
       contents: read
       actions: read
+      issues: read
+      pull-requests: read
+      checks: read
+      statuses: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,7 +32,7 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
-          publish_results: true
+          publish_results: false
           
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4

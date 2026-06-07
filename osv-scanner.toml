@@ -1,4 +1,4 @@
 [[IgnoredVulns]]
 id = "GO-2024-3218"
-ignoreUntil = "2028-01-01"
+ignoreUntil = "2028-01-01T00:00:00Z"
 reason = "Unfixed upstream vulnerability in go-libp2p-kad-dht. No patch available yet."
