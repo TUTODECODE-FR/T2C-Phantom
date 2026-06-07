@@ -1,0 +1,25 @@
+name: DCO Check
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  check-dco:
+    name: Verify Signed-off-by
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Check DCO
+        run: |
+          echo "Checking commits for DCO (Signed-off-by) signature..."
+          for commit in $(git rev-list origin/${{ github.base_ref }}..HEAD); do
+            if ! git show -s --format=%B $commit | grep -q 'Signed-off-by:'; then
+              echo "❌ Error: Commit $commit is missing the 'Signed-off-by:' line."
+              echo "Please amend your commits with 'git commit --amend -s' and force push."
+              exit 1
+            fi
+          done

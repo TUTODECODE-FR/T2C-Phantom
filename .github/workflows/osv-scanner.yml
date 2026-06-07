@@ -1,0 +1,19 @@
+name: OSV-Scanner
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 12 * * 1'
+  push:
+    branches: [ "main" ]
+
+jobs:
+  scan:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Google OSV-Scanner
+      uses: google/osv-scanner-action/osv-scanner-action@v1.9.0
