@@ -5,10 +5,22 @@
 
   **« Le savoir ne devrait pas toujours dépendre d'une connexion centralisée. »**<br>
 
-  [![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E)]()
-  [![libp2p](https://img.shields.io/badge/libp2p-000000?style=for-the-badge&logo=ipfs&logoColor=white&labelColor=1A1D2E)]()
-  [![Proprietary](https://img.shields.io/badge/License-All_Rights_Reserved-D93025?style=for-the-badge&labelColor=1A1D2E)]()
-  [![Privacy By Design](https://img.shields.io/badge/Privacy-By%20Design-3DDC84?style=for-the-badge&labelColor=1A1D2E&color=3DDC84)]()
+  <!-- CI & Security Badges -->
+  <p>
+    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/TUTODECODE-FR/T2C-Phantom/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1A1D2E&color=3DDC84" alt="CI Build"></a>
+    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/osv-scanner.yml"><img src="https://img.shields.io/github/actions/workflow/status/TUTODECODE-FR/T2C-Phantom/osv-scanner.yml?label=Google%20OSV&style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1b1510" alt="OSV Scanner"></a>
+    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/codeql.yml"><img src="https://img.shields.io/github/actions/workflow/status/TUTODECODE-FR/T2C-Phantom/codeql.yml?label=CodeQL%20SAST&style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1b1510" alt="CodeQL SAST"></a>
+    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/scorecard.yml"><img src="https://img.shields.io/github/actions/workflow/status/TUTODECODE-FR/T2C-Phantom/scorecard.yml?label=OpenSSF%20Scorecard&style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1b1510" alt="OpenSSF Scorecard"></a>
+  </p>
+
+  <!-- Tech & Distribution Badges -->
+  <p>
+    <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.26.4-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E" alt="Go"></a>
+    <a href="https://libp2p.io/"><img src="https://img.shields.io/badge/libp2p-Networking-000000?style=for-the-badge&logo=ipfs&logoColor=white&labelColor=1A1D2E" alt="libp2p"></a>
+    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/releases/latest"><img src="https://img.shields.io/github/v/release/TUTODECODE-FR/T2C-Phantom?style=for-the-badge&logo=github&color=F5EBDA&labelColor=1A1D2E&logoColor=F5EBDA" alt="Release"></a>
+    <a href="#"><img src="https://img.shields.io/badge/License-Proprietary-D93025?style=for-the-badge&labelColor=1A1D2E" alt="License"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Privacy-By%20Design-3DDC84?style=for-the-badge&labelColor=1A1D2E&color=3DDC84" alt="Privacy"></a>
+  </p>
   
   <br>
   <p>
