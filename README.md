@@ -65,14 +65,14 @@ Il n'y a **aucun serveur central d'adressage**. Pour localiser les données, le 
 Le binaire est conçu pour être 100% autonome et sans dépendances (Air-Gapped ready). Une fois téléchargé depuis la section **Releases**, voici comment l'utiliser :
 
 ### 1. Démarrer le Nœud Local
-Ouvrez votre terminal dans le dossier contenant l'exécutable et lancez le démon en spécifiant un port proxy. Pour traverser des réseaux hostiles, vous pouvez vous masquer derrière un relais cryptographique de confiance.
+Ouvrez votre terminal dans le dossier contenant l'exécutable et lancez le démon. Pour vous connecter au réseau en contournant les pare-feux, utilisez notre Relais Public Officiel :
 
 ```bash
 # Sur Mac/Linux :
-./t2c start --proxy 8080 --use-relay /ip4/<VOTRE_RELAIS>/tcp/443/wss/p2p/<PEER_ID>
+./t2c start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
 
 # Sur Windows :
-t2c.exe start --proxy 8080 --use-relay /ip4/<VOTRE_RELAIS>/tcp/443/wss/p2p/<PEER_ID>
+t2c.exe start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
 ```
 *Le nœud démarrera instantanément, générera une identité éphémère (si aucune clé n'est fournie), et se connectera silencieusement à l'essaim P2P.*
 
