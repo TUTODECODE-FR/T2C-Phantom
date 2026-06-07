@@ -10,7 +10,7 @@
     <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/Build-Passing-3DDC84?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1A1D2E" alt="CI Build"></a>
     <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/osv-scanner.yml"><img src="https://img.shields.io/badge/Google%20OSV-Passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1b1510" alt="OSV Scanner"></a>
     <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/codeql.yml"><img src="https://img.shields.io/badge/CodeQL%20SAST-Passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1b1510" alt="CodeQL SAST"></a>
-    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/releases/latest"><img src="https://img.shields.io/badge/Release-V1.0.0-F5EBDA?style=for-the-badge&logo=github&labelColor=1A1D2E&logoColor=F5EBDA" alt="Release"></a>
+    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/releases/latest"><img src="https://img.shields.io/badge/Release-V1.1.0-F5EBDA?style=for-the-badge&logo=github&labelColor=1A1D2E&logoColor=F5EBDA" alt="Release"></a>
   </p>
 
   <p>
