@@ -37,3 +37,12 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
+      with:
+        upload: false
+
+    - name: Upload CodeQL SARIF artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: codeql-sarif
+        path: ../results/go.sarif
+        retention-days: 5
