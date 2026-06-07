@@ -105,7 +105,7 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 		libp2p.NATPortMap(),  // Enable uPnP / NAT-PMP
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
-			idht, err = dht.New(context.Background(), h, dht.Mode(dht.ModeAuto))
+			idht, err = dht.New(context.Background(), h, dht.Mode(dht.ModeAuto), dht.ProtocolPrefix("/t2c/phantom/v1"))
 			return idht, err
 		}),
 	}
