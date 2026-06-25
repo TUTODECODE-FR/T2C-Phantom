@@ -10,7 +10,6 @@
     <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/Build-Passing-3DDC84?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1A1D2E" alt="CI Build"></a>
     <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/osv-scanner.yml"><img src="https://img.shields.io/badge/Google%20OSV-Passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1b1510" alt="OSV Scanner"></a>
     <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/actions/workflows/codeql.yml"><img src="https://img.shields.io/badge/CodeQL%20SAST-Passing-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=1b1510" alt="CodeQL SAST"></a>
-    <a href="https://github.com/TUTODECODE-FR/T2C-Phantom/releases/latest"><img src="https://img.shields.io/badge/Release-V1.1.0-F5EBDA?style=for-the-badge&logo=github&labelColor=1A1D2E&logoColor=F5EBDA" alt="Release"></a>
   </p>
 
   <p>
@@ -141,9 +140,16 @@ T2C Phantom a été conçu pour l'efficacité et la légèreté, afin de tourner
 
 ## 🚀 Guide Rapide : Installation et Utilisation
 
-Le binaire est autonome et Air-Gapped ready. Une fois téléchargé depuis la section **Releases**, voici la marche à suivre :
+Le projet est conçu pour être compilé depuis les sources afin de garantir une intégrité totale. Assurez-vous d'avoir **Go 1.26+** installé.
 
-### 1. Démarrer le Nœud Local
+### 1. Cloner et Compiler
+```bash
+git clone https://github.com/TUTODECODE-FR/T2C-Phantom.git
+cd T2C-Phantom
+go build -v -o t2c ./cmd/t2c
+```
+
+### 2. Démarrer le Nœud Local
 Ouvrez votre terminal dans le dossier contenant l'exécutable et lancez le démon. Pour vous connecter au réseau en traversant les NAT, utilisez le relais public :
 
 ```bash
