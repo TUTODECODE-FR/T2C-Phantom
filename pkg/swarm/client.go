@@ -3,6 +3,7 @@ package swarm
 import (
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -141,23 +142,32 @@ func performSync(ctx context.Context, sm *SwarmManager, h host.Host, pubKeyHash,
 
 	localZipPath := filepath.Join(sm.ZipStorage, record.ZipHash+".zip")
 	if _, err := os.Stat(localZipPath); err == nil {
-		// We already have this zip. Let's make sure it's extracted.
-		if _, err := os.Stat(filepath.Join(siteDir, "index.html")); err != nil {
-			if downloadedBytes, err := os.ReadFile(localZipPath); err == nil {
-				UnzipDirectory(downloadedBytes, siteDir)
+		zipHashStr, err := HashLocalFile(localZipPath)
+		if err == nil {
+			if subtle.ConstantTimeCompare([]byte(zipHashStr), []byte(record.ZipHash)) == 0 {
+				// Corrupted or maliciously modified ZIP!
+				os.Remove(localZipPath)
+				os.RemoveAll(siteDir)
+				fmt.Printf("🚨 Security Alert: Local ZIP hash mismatch for %s. Deleting and re-downloading.\n", pubKeyHash)
+			} else {
+				// We already have this VALID zip. Let's make sure it's extracted.
+				if _, err := os.Stat(filepath.Join(siteDir, "index.html")); err != nil {
+					// We need the bytes to pass to UnzipDirectory which still takes []byte
+					if downloadedBytes, err := os.ReadFile(localZipPath); err == nil {
+						UnzipDirectory(downloadedBytes, siteDir)
+					}
+				}
+				// Save the record to the site directory
+				if recordBytes, err := SerializeRecord(record); err == nil {
+					os.WriteFile(filepath.Join(siteDir, "record.json"), recordBytes, 0644)
+				}
+				sm.Mutex.Lock()
+				sm.Records[pubKeyHash] = record
+				sm.Mutex.Unlock()
+				sm.AnnounceSite(ctx, pubKeyHash)
+				return nil
 			}
 		}
-
-		// Save the record to the site directory
-		if recordBytes, err := SerializeRecord(record); err == nil {
-			os.WriteFile(filepath.Join(siteDir, "record.json"), recordBytes, 0644)
-		}
-
-		sm.Mutex.Lock()
-		sm.Records[pubKeyHash] = record
-		sm.Mutex.Unlock()
-		sm.AnnounceSite(ctx, pubKeyHash)
-		return nil
 	}
 
 	// 5. Download the ZIP

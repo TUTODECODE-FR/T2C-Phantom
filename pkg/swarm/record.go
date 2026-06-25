@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -39,6 +41,23 @@ func (r *RoutingRecord) Verify(pub crypto.PubKey) (bool, error) {
 func HashFileBytes(data []byte) string {
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
+}
+
+func HashReader(r io.Reader) (string, error) {
+	h := sha256.New()
+	if _, err := io.Copy(h, r); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func HashLocalFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	return HashReader(f)
 }
 
 func CreateRecord(priv crypto.PrivKey, zipBytes []byte) (*RoutingRecord, error) {

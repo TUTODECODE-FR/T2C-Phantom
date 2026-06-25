@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
@@ -95,7 +96,13 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 		addrs = append(addrs, "/ip4/0.0.0.0/tcp/443")
 	}
 
+	rm, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.DefaultLimits.AutoScale()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource manager: %w", err)
+	}
+
 	opts := []libp2p.Option{
+		libp2p.ResourceManager(rm),
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(addrs...),
 		libp2p.Transport(tcp.NewTCPTransport),
@@ -192,6 +199,9 @@ func (n *Node) Bootstrap(ctx context.Context, bootstrapPeers []string) error {
 		}
 		if err := n.Host.Connect(ctx, *pi); err != nil {
 			fmt.Printf("Failed to connect to bootstrap peer %s: %s\n", addr, err)
+		} else {
+			// Protect the connection to prevent Eclipse Attacks
+			n.Host.ConnManager().Protect(pi.ID, "anchor-node")
 		}
 	}
 

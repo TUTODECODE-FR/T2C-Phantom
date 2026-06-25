@@ -112,7 +112,15 @@ Pour une sécurité optimale, il est crucial de comprendre ce que T2C Phantom **
 - **Ne protège pas contre un poste compromis** : Si votre système d'exploitation est infecté, le chiffrement du réseau devient inefficace.
 - **Ne remplace pas Tor** : Ce n'est pas un outil d'anonymat absolu. L'adresse IP de votre machine est techniquement visible par le relais auquel vous vous connectez.
 - **Ne garantit pas l'anonymat total** : Le but est la confidentialité des données (chiffrement) et le contournement de la censure locale, pas le masquage de l'émetteur.
-- **Peut être bloqué par une inspection TLS avancée** : Si un pare-feu d'entreprise déchiffre le trafic TLS avec un certificat Root d'entreprise injecté de force, la connexion sera interrompue.
+- **Ne peut résister à une surveillance globale (Global Passive Adversary)** : Les protocoles Onion et P2P offrent un haut degré de confidentialité mais ne sont pas infaillibles face à une surveillance à l'échelle d'un pays.
+
+### 🛡️ Protections Actives & Mitigations
+T2C-Phantom a été audité et durci pour résister aux attaques opportunistes :
+- **Anti-DDoS et Sybil (Resource Manager)** : Le gestionnaire Auto-Scale de libp2p limite dynamiquement la consommation mémoire, les descripteurs de fichiers et le nombre maximal de connexions par IP pour protéger la DHT Kademlia.
+- **Isolation d'Archives (Sandboxing)** : Extraction sécurisée bloquant les attaques **Zip Bomb** (> 250 Mo), **ZipSlip** (Path Traversal) et le contournement par **Liens Symboliques**.
+- **Audit de Sécurité en Temps Réel** : Tous les événements suspects (corruption de signature, requêtes malveillantes) sont silencieusement enregistrés au format JSON (`data/security.log`) sans bloquer le processus client.
+- **Résistance aux Attaques Temporelles** : Comparaison en temps constant (`subtle.ConstantTimeCompare`) pour protéger les signatures cryptographiques.
+- **Anti-Manipulation API** : Blocage du DNS Rebinding.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 

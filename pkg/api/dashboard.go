@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"t2c/pkg/crypto"
 	"t2c/pkg/p2p"
@@ -46,7 +47,27 @@ func (d *Dashboard) Start(port int) error {
 	fmt.Printf("Web Interface ready: http://%s\n", addr)
 	fmt.Printf("Serving files from: %s\n", dir)
 	fmt.Printf("=====================\n\n")
-	return http.ListenAndServe(addr, mux)
+	// Middleware pour bloquer le DNS Rebinding
+	dnsRebindingMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			validHost1 := fmt.Sprintf("127.0.0.1:%d", port)
+			validHost2 := fmt.Sprintf("localhost:%d", port)
+			if r.Host != validHost1 && r.Host != validHost2 {
+				http.Error(w, "Forbidden: Invalid Host", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      dnsRebindingMiddleware(mux),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+	return srv.ListenAndServe()
 }
 
 func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {

@@ -1,22 +1,26 @@
 package swarm
 
 import (
+	"archive/zip"
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+	"t2c/pkg/utils"
 	"time"
 
 	"github.com/ipfs/go-cid"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mh "github.com/multiformats/go-multihash"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"sync"
 )
 
 const SyncProtocolID = "/t2c/swarm/1.0"
@@ -83,9 +87,23 @@ func NewSwarmManager(h host.Host, d *dht.IpfsDHT, zipStorage string) *SwarmManag
 			sm.Records[pubKeyHash] = record
 			sm.Mutex.Unlock()
 
-			// Announce to DHT
-			sm.AnnounceSite(ctx, pubKeyHash)
 			fmt.Printf("📡 Swarm: Reprise du seeding pour le site %s\n", pubKeyHash)
+		}
+
+		// Loop permanently to announce sites every 2 minutes
+		for {
+			time.Sleep(5 * time.Second) // wait for relay connection on startup
+			sm.Mutex.Lock()
+			var hashes []string
+			for hash := range sm.Records {
+				hashes = append(hashes, hash)
+			}
+			sm.Mutex.Unlock()
+
+			for _, h := range hashes {
+				sm.AnnounceSite(ctx, h)
+			}
+			time.Sleep(2 * time.Minute)
 		}
 	}()
 
@@ -97,7 +115,12 @@ func (sm *SwarmManager) handleStream(stream network.Stream) {
 	if sm.DisableSeeding {
 		return // Seeding is disabled, do not respond to requests
 	}
-	reader := bufio.NewReader(stream)
+	
+	// Anti-Slowloris / Goroutine Leak protection
+	stream.SetReadDeadline(time.Now().Add(10 * time.Second))
+	
+	limitReader := io.LimitReader(stream, 4096)
+	reader := bufio.NewReader(limitReader)
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return
@@ -136,11 +159,129 @@ func GetCIDForString(str string) (cid.Cid, error) {
 	return pref.Sum([]byte(str))
 }
 
+// VerifySiteIntegrity hashes the local ZIP and compares every extracted file against the ZIP contents.
+func VerifySiteIntegrity(sm *SwarmManager, pubKeyHash string, record *RoutingRecord) error {
+	localZipPath := filepath.Join(sm.ZipStorage, record.ZipHash+".zip")
+	
+	// 1. Verify the ZIP hash (Immutability check) via streaming
+	zipHashStr, err := HashLocalFile(localZipPath)
+	if err != nil {
+		return fmt.Errorf("could not read local zip: %w", err)
+	}
+	if subtle.ConstantTimeCompare([]byte(zipHashStr), []byte(record.ZipHash)) == 0 {
+		utils.LogSecurityEvent("local_zip_hash_mismatch", "Local ZIP hash does not match record", pubKeyHash)
+		return fmt.Errorf("local ZIP hash mismatch")
+	}
+
+	// 2. Open ZIP in streaming mode
+	zipReader, err := zip.OpenReader(localZipPath)
+	if err != nil {
+		return fmt.Errorf("could not open local zip: %w", err)
+	}
+	defer zipReader.Close()
+
+	siteDir := filepath.Join("data", "sites", pubKeyHash)
+	
+	// Create a map to track which files are in the zip
+	zipFiles := make(map[string]bool)
+
+	// 3. Compare each file in the ZIP to the extracted file on disk
+	for _, f := range zipReader.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		
+		// Prevent path traversal vulnerabilities locally
+		if strings.Contains(f.Name, "..") {
+			continue
+		}
+		
+		zipFiles[f.Name] = true
+
+		// Read file from ZIP via streaming
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("failed to open file in zip: %s", f.Name)
+		}
+		zipFileHash, err := HashReader(rc)
+		rc.Close()
+		if err != nil {
+			return fmt.Errorf("failed to hash file in zip: %s", f.Name)
+		}
+
+		// Read file from disk via streaming
+		diskPath := filepath.Join(siteDir, f.Name)
+		diskFileHash, err := HashLocalFile(diskPath)
+		if err != nil {
+			return fmt.Errorf("missing extracted file: %s", f.Name)
+		}
+
+		// Compare hashes securely against Timing Attacks
+		if subtle.ConstantTimeCompare([]byte(zipFileHash), []byte(diskFileHash)) == 0 {
+			utils.LogSecurityEvent("extracted_file_tampered", fmt.Sprintf("File %s hash mismatch", f.Name), pubKeyHash)
+			return fmt.Errorf("extracted file tampered: %s", f.Name)
+		}
+	}
+
+	// 4. Verify no extra injected files (Side-channel risk)
+	err = filepath.Walk(siteDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if info.Name() == "record.json" { // We inject record.json ourselves
+			return nil
+		}
+		
+		relPath, err := filepath.Rel(siteDir, path)
+		if err != nil {
+			return err
+		}
+		
+		// Normalize paths for cross-platform (windows uses \)
+		relPath = filepath.ToSlash(relPath)
+
+		if !zipFiles[relPath] {
+			utils.LogSecurityEvent("injected_malicious_file", fmt.Sprintf("File %s not in ZIP", relPath), pubKeyHash)
+			return fmt.Errorf("injected malicious file detected: %s", relPath)
+		}
+		return nil
+	})
+
+	return err
+}
+
 // AnnounceSite tells the DHT that we host this site.
 func (sm *SwarmManager) AnnounceSite(ctx context.Context, pubKeyHash string) error {
 	if sm.DisableSeeding {
 		return nil // Seeding is disabled, do not announce
 	}
+	
+	sm.Mutex.Lock()
+	record, ok := sm.Records[pubKeyHash]
+	sm.Mutex.Unlock()
+
+	if ok {
+		if err := VerifySiteIntegrity(sm, pubKeyHash, record); err != nil {
+			// Auditable alert!
+			fmt.Printf("\n🚨 ALERTE SÉCURITÉ : Le module %s a été modifié localement !\n", pubKeyHash)
+			fmt.Printf("Détail : %v\n", err)
+			fmt.Println("Action : Réinitialisation vers la version officielle et arrêt de l'hébergement.\n")
+			
+			// Delete corrupted files
+			os.Remove(filepath.Join(sm.ZipStorage, record.ZipHash+".zip"))
+			os.RemoveAll(filepath.Join("data", "sites", pubKeyHash))
+			
+			sm.Mutex.Lock()
+			delete(sm.Records, pubKeyHash)
+			sm.Mutex.Unlock()
+			
+			return err
+		}
+	}
+
 	id, err := GetCIDForString(pubKeyHash)
 	if err != nil {
 		return err

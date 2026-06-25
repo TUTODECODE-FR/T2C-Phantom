@@ -13,6 +13,7 @@ import (
 	"t2c/pkg/crypto"
 	"t2c/pkg/p2p"
 	"t2c/pkg/proxy"
+	"t2c/pkg/utils"
 
 	ic "github.com/libp2p/go-libp2p/core/crypto"
 )
@@ -22,6 +23,9 @@ func main() {
 		printHelp()
 		os.Exit(1)
 	}
+
+	// Initialisation du Logger de sécurité
+	utils.InitSecurityLogger("data/security.log")
 
 	cmd := os.Args[1]
 

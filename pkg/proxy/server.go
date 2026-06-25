@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -65,6 +66,7 @@ func StartProxyServer(node *p2p.Node, listenAddr, carnetPath string) error {
 			http.FileServer(http.Dir(siteDir)).ServeHTTP(w, req)
 			return
 		}
+		fmt.Println("Swarm Sync Error:", err)
 
 		// --- DIRECT P2P TUNNEL MODE (Fallback for dynamic services/Git) ---
 		peerID, parseErr := crypto.ParseT2CAddress(pubKeyHash)
@@ -177,8 +179,11 @@ func StartProxyServer(node *p2p.Node, listenAddr, carnetPath string) error {
 	})
 
 	server := &http.Server{
-		Addr:    listenAddr,
-		Handler: handler,
+		Addr:         listenAddr,
+		Handler:      handler,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
 	}
 
 	fmt.Printf("🚀 T2C Swarm Gateway running on http://%s\n", listenAddr)

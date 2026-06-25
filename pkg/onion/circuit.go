@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -22,7 +23,9 @@ type OnionMessage struct {
 // RegisterOnionRelay registers the handler so this node acts as an onion relay.
 func RegisterOnionRelay(h host.Host, getExitPort func() int) {
 	h.SetStreamHandler(ProtocolID, func(stream network.Stream) {
-		reader := bufio.NewReader(stream)
+		stream.SetReadDeadline(time.Now().Add(10 * time.Second))
+		limitReader := io.LimitReader(stream, 4096)
+		reader := bufio.NewReader(limitReader)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			stream.Reset()
@@ -65,6 +68,12 @@ func RegisterOnionRelay(h host.Host, getExitPort func() int) {
 		// Relay mode: Connect to the next hop
 		nextPeerID, err := peer.Decode(msg.Next)
 		if err != nil {
+			stream.Reset()
+			return
+		}
+
+		// Anti-Loop / Amplification DDoS protection
+		if nextPeerID == h.ID() || nextPeerID == stream.Conn().RemotePeer() {
 			stream.Reset()
 			return
 		}
