@@ -268,7 +268,7 @@ func (sm *SwarmManager) AnnounceSite(ctx context.Context, pubKeyHash string) err
 			// Auditable alert!
 			fmt.Printf("\n🚨 ALERTE SÉCURITÉ : Le module %s a été modifié localement !\n", pubKeyHash)
 			fmt.Printf("Détail : %v\n", err)
-			fmt.Println("Action : Réinitialisation vers la version officielle et arrêt de l'hébergement.\n")
+			fmt.Println("Action : Réinitialisation vers la version officielle et arrêt de l'hébergement.")
 			
 			// Delete corrupted files
 			os.Remove(filepath.Join(sm.ZipStorage, record.ZipHash+".zip"))
