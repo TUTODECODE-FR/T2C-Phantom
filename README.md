@@ -13,10 +13,11 @@
   </p>
 
   <p>
-    <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.26.4-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E" alt="Go"></a>
+    <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E" alt="Go Version"></a>
     <a href="https://libp2p.io/"><img src="https://img.shields.io/badge/libp2p-Networking-02569B?style=for-the-badge&logo=ipfs&logoColor=white&labelColor=1A1D2E" alt="libp2p"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Architecture-Zero--Trust-red?style=for-the-badge&labelColor=1A1D2E" alt="Architecture"></a>
     <a href="#"><img src="https://img.shields.io/badge/Privacy-By%20Design-3DDC84?style=for-the-badge&labelColor=1A1D2E" alt="Privacy"></a>
-    <a href="#"><img src="https://img.shields.io/badge/License-Proprietary-FCC624?style=for-the-badge&labelColor=1A1D2E" alt="License"></a>
+    <a href="#"><img src="https://img.shields.io/badge/License-Propriétaire-blue?style=for-the-badge&labelColor=1A1D2E" alt="License"></a>
   </p>
 
   <!-- OpenSSF Badges -->
@@ -41,9 +42,9 @@ Alors qu'il existe déjà des réseaux éprouvés comme IPFS, Tor, ou BitTorrent
 - **T2C Phantom** est un compromis spécifique : un moteur réseau léger (conçu pour l'embarqué et les connexions instables), optimisé pour la distribution de modules éducatifs chiffrés. Il encapsule son trafic dans des flux standards (WSS) pour garantir une haute disponibilité même dans les environnements restrictifs (universités, réseaux d'entreprise).
 
 ## ⚠️ PROPRIÉTÉ INTELLECTUELLE & LICENCE
-> [!CAUTION]
-> **Ce dépôt est "Source-Available" (Auditable) mais n'est PAS Open Source.**
-> Le code de T2C Phantom est maintenu sous propriété intellectuelle stricte (**Tous droits réservés**). 
+> [!WARNING]
+> **PROPRIÉTÉ INTELLECTUELLE & LICENCE**
+> Ce dépôt est "Source-Available" (Auditable) mais n'est PAS Open Source. Le code de T2C Phantom est maintenu sous propriété intellectuelle stricte (**Tous droits réservés**). 
 > L'utilisation, la modification, la distribution ou l'intégration commerciale de ce moteur réseau par des entités tierces est **formellement interdite** sans accord écrit de TUTODECODE.
 
 **Pourquoi cette protection (Transparence Hybride) ?**
@@ -114,12 +115,17 @@ Pour une sécurité optimale, il est crucial de comprendre ce que T2C Phantom **
 - **Ne peut résister à une surveillance globale (Global Passive Adversary)** : Les protocoles Onion et P2P offrent un haut degré de confidentialité mais ne sont pas infaillibles face à une surveillance à l'échelle d'un pays.
 
 ### 🛡️ Protections Actives & Mitigations
-T2C-Phantom a été audité et durci pour résister aux attaques opportunistes :
-- **Anti-DDoS et Sybil (Resource Manager)** : Le gestionnaire Auto-Scale de libp2p limite dynamiquement la consommation mémoire, les descripteurs de fichiers et le nombre maximal de connexions par IP pour protéger la DHT Kademlia.
-- **Isolation d'Archives (Sandboxing)** : Extraction sécurisée bloquant les attaques **Zip Bomb** (> 250 Mo), **ZipSlip** (Path Traversal) et le contournement par **Liens Symboliques**.
-- **Audit de Sécurité en Temps Réel** : Tous les événements suspects (corruption de signature, requêtes malveillantes) sont silencieusement enregistrés au format JSON (`data/security.log`) sans bloquer le processus client.
-- **Résistance aux Attaques Temporelles** : Comparaison en temps constant (`subtle.ConstantTimeCompare`) pour protéger les signatures cryptographiques.
-- **Anti-Manipulation API** : Blocage du DNS Rebinding.
+T2C-Phantom a été audité et durci pour résister aux attaques opportunistes et étendre ses capacités de survie :
+
+- **Modèle Zero-Trust (Vérification en RAM)** : L'empreinte cryptographique de chaque segment téléchargé est vérifiée en mémoire vive (SHA-256) avant écriture sur disque, annihilant les attaques de type TOCTOU.
+- **Evasion DPI (Obfuscation WebRTC)** : Le transport réseau exploite des tunnels UDP (WebRTC-Direct) déguisant le trafic P2P en flux de visioconférence (type Google Meet) pour traverser les pare-feux institutionnels stricts.
+- **Système Immunitaire P2P (Consensus)** : Un annuaire central (Tracker) gère l'exclusion des nœuds malveillants. Pour empêcher le *Review Bombing*, le système exige le signalement concordant de plusieurs adresses IP distinctes avant tout bannissement.
+- **Moteur de Survie (Failover Automatique)** : En cas de réception de blocs falsifiés ou d'indisponibilité du swarm, le système bascule de façon transparente vers l'infrastructure HTTP de secours pour garantir la complétion du téléchargement sans interrompre l'expérience utilisateur.
+- **Authentification Ed25519 & Anti-Rejeu** : Les communications critiques avec l'API exigent une signature asymétrique Ed25519, un horodatage (Timestamp) et un cache de Nonces pour rendre toute tentative d'attaque par rejeu inopérante.
+- **Hardening DMZ & Rate Limiting** : L'architecture LXC est barricadée derrière un pare-feu applicatif (Nginx) appliquant un Rate Limiting impitoyable et des règles de filtrage interdisant tout mouvement latéral vers le cœur logique.
+- **Observabilité SOC (Prometheus)** : T2C-Phantom exporte nativement ses propres métriques de sécurité (attaques déjouées, pairs bannis, basculements) pour alimenter en temps réel des tableaux de bord de supervision (Grafana).
+- **Anti-DDoS et Sybil (Resource Manager)** : Limitation dynamique de la consommation mémoire et des descripteurs de fichiers pour protéger la topologie Kademlia.
+- **Isolation d'Archives (Sandboxing)** : Extraction sécurisée bloquant les attaques **Zip Bomb**, **ZipSlip** et la compromission via liens symboliques.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
