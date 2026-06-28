@@ -27,7 +27,6 @@ func main() {
 	case "start":
 		startCmd := flag.NewFlagSet("start", flag.ExitOnError)
 		privKeyB64 := startCmd.String("key", "", "Base64 Private Key")
-		port := startCmd.Int("port", 4001, "P2P Listen Port")
 		bootstrap := startCmd.String("bootstrap", "", "Comma-separated bootstrap peers")
 		useRelay := startCmd.String("use-relay", "", "Connect to a Relay to mask your real IP")
 		// The expose flag was here in admin originally!
@@ -49,7 +48,7 @@ func main() {
 
 		ctx := context.Background()
 		// FOR ADMIN NODE, isRelay IS TRUE! This forces Public reachability for DHT Kademlia!
-		node, err := p2p.NewNode(ctx, privKey, *port, true)
+		node, err := p2p.NewNode(ctx, privKey, 4001, true, nil)
 		if err != nil {
 			fmt.Println("Failed to start node:", err)
 			return

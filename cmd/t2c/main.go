@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"t2c/pkg/api"
+	"t2c/pkg/metrics"
 	"t2c/pkg/crypto"
 	"t2c/pkg/p2p"
 	"t2c/pkg/proxy"
@@ -63,7 +64,7 @@ func main() {
 		carnetPath := startCmd.String("carnet", "data/carnet.json", "Path to the carnet.json file for DNS aliases")
 
 		// Nouveaux drapeaux pour la V2 (Relay)
-		useRelay := startCmd.String("use-relay", "", "Hide behind a specific Relay (multiaddr) to mask IP")
+		relaysStr := startCmd.String("relays", "", "Comma-separated list of Relays (multiaddrs) to mask IP and ensure high availability")
 
 		startCmd.Parse(os.Args[2:])
 
@@ -92,12 +93,20 @@ func main() {
 		}
 
 		ctx := context.Background()
+		var relays []string
+		if *relaysStr != "" {
+			relays = strings.Split(*relaysStr, ",")
+		}
+
 		// For the client, we hardcode isRelay to false for security.
-		node, err := p2p.NewNode(ctx, privKey, *port, false)
+		node, err := p2p.NewNode(ctx, privKey, *port, false, relays)
 		if err != nil {
-			fmt.Println("Failed to start node:", err)
+			fmt.Println("Failed to start relay node:", err)
 			return
 		}
+
+		// 📊 Lancement du SOC (Metrics Prometheus)
+		go metrics.StartMetricsServer("9090")
 
 		addr, _ := crypto.GetT2CAddress(privKey.GetPublic())
 		fmt.Println("=== T2C Client Daemon Started ===")
@@ -131,11 +140,13 @@ func main() {
 			}
 
 			// Réservation d'un relais si demandé pour masquer son IP
-			if *useRelay != "" {
-				relayCtx, cancelRelay := context.WithTimeout(ctx, 20*time.Second)
-				defer cancelRelay()
-				if err := node.ReserveRelay(relayCtx, *useRelay); err != nil {
-					fmt.Println("Failed to reserve relay:", err)
+			if len(relays) > 0 {
+				for _, r := range relays {
+					relayCtx, cancelRelay := context.WithTimeout(ctx, 20*time.Second)
+					if err := node.ReserveRelay(relayCtx, r); err != nil {
+						fmt.Printf("Failed to reserve relay %s: %v\n", r, err)
+					}
+					cancelRelay()
 				}
 			}
 		}()

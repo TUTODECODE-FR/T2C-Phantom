@@ -21,6 +21,7 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
 	"github.com/multiformats/go-multiaddr"
 	"t2c/pkg/onion"
 	"t2c/pkg/swarm"
@@ -72,7 +73,7 @@ func (n *discoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	n.h.Connect(context.Background(), pi)
 }
 
-func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRelay bool) (*Node, error) {
+func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRelay bool, staticRelays []string) (*Node, error) {
 	var idht *dht.IpfsDHT
 
 	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", listenPort) // tcp/4001
@@ -87,8 +88,9 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 	}
 	wsAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d/ws", wsPort) // tcp/8443/ws
 	quicAddr := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", quicPort)
+	webrtcAddr := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/webrtc-direct", quicPort) // WebRTC (UDP) pour l'obfuscation DPI
 
-	addrs := []string{wsAddr, quicAddr}
+	addrs := []string{wsAddr, quicAddr, webrtcAddr}
 	// Always listen on Raw TCP for IPFS/AutoRelay
 	addrs = append(addrs, listenAddr)
 	
@@ -107,15 +109,33 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 		libp2p.ListenAddrStrings(addrs...),
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(libp2pquic.NewTransport),
+		libp2p.Transport(libp2pwebrtc.New), // Transport WebRTC pour simuler Google Meet (anti-DPI)
 		libp2p.Transport(ws.New, ws.WithTLSClientConfig(&tls.Config{InsecureSkipVerify: true})), // Override WS for self-signed WSS
 		libp2p.EnableRelay(), // Always enable client relay capability
 		libp2p.NATPortMap(),  // Enable uPnP / NAT-PMP
-		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+	}
+
+	// 🛡️ Multi-Relay Bootstrapping (Anti-SPOF)
+	if len(staticRelays) > 0 {
+		var relayPinfos []peer.AddrInfo
+		for _, r := range staticRelays {
+			ma, err := multiaddr.NewMultiaddr(r)
+			if err == nil {
+				if pi, err := peer.AddrInfoFromP2pAddr(ma); err == nil {
+					relayPinfos = append(relayPinfos, *pi)
+				}
+			}
+		}
+		if len(relayPinfos) > 0 {
+			opts = append(opts, libp2p.EnableAutoRelayWithStaticRelays(relayPinfos))
+		}
+	}
+
+	opts = append(opts, libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 			var err error
 			idht, err = dht.New(context.Background(), h, dht.Mode(dht.ModeAuto), dht.ProtocolPrefix("/t2c/phantom/v1"))
 			return idht, err
-		}),
-	}
+		}))
 
 	if isRelay {
 		opts = append(opts, libp2p.ForceReachabilityPublic())
