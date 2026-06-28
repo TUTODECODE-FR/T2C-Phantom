@@ -1,0 +1,20 @@
+# Binaires compilés
+t2c
+main
+t2c_dev
+t2c_test
+t2c-linux-*
+t2c-mac-*
+t2c-windows-*.exe
+
+# Logs et sauvegardes
+*.log
+*.bak
+*.old
+test.txt
+coverage.txt
+admin_key.txt
+
+# Dossiers générés
+data/
+export_swarm/
