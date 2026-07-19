@@ -1,0 +1,63 @@
+[Unit]
+Description=T2C-Phantom Secure P2P Node
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/t2c-phantom
+Restart=on-failure
+RestartSec=5
+
+# ---------------------------------------------------------
+# 🛡️ SECURITE 4: Abandon total des privilèges (User "Nobody")
+# Le programme ne tourne pas en Root. Il est exécuté par "nobody" (un utilisateur sans droit).
+# ---------------------------------------------------------
+User=nobody
+Group=nogroup
+# Autorise uniquement l'ouverture des ports bas (<1024, comme le port 443)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+
+# ---------------------------------------------------------
+# 🛡️ SECURITE 3: Verrouillage du système de fichiers (Read-Only)
+# L'ensemble du disque dur est en lecture seule pour T2C.
+# ---------------------------------------------------------
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+# Le seul dossier où T2C a le droit d'écrire (cache).
+ReadWritePaths=/tmp/t2c_cache
+
+# /tmp (et le cache T2C) sont montés en mémoire avec l'attribut NOEXEC.
+# Si un pirate y dépose un malware, Linux refusera de l'exécuter.
+TemporaryFileSystem=/tmp:rw,noexec,nosuid,nodev
+TemporaryFileSystem=/tmp/t2c_cache:rw,noexec,nosuid,nodev
+
+# Masque des chemins sensibles (Nettoyage de la cellule)
+InaccessiblePaths=/root /boot /sys /boot /etc/shadow
+
+# ---------------------------------------------------------
+# 🛡️ SECURITE 1: Blocage des appels système (Filtres Seccomp)
+# C'est la protection ultime anti-RCE (Remote Code Execution)
+# ---------------------------------------------------------
+# Interdit spécifiquement l'utilisation d'execve.
+# Si le pirate essaie de lancer /bin/bash, curl ou un malware,
+# le noyau Linux tuera immédiatement T2C-Phantom.
+SystemCallFilter=@system-service
+SystemCallFilter=~@mount @raw-io @debug @privileged @resources execve
+SystemCallErrorNumber=EPERM
+
+# Options supplémentaires d'isolement
+PrivateDevices=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

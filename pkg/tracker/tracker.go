@@ -3,6 +3,7 @@ package tracker
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"t2c/pkg/crypto"
@@ -51,7 +52,21 @@ func (t *Tracker) HandleReportPeer(w http.ResponseWriter, r *http.Request) {
 	// Récupérer l'IP du rapporteur (X-Forwarded-For transmis par le LXC Proxy)
 	reporterIP := r.Header.Get("X-Forwarded-For")
 	if reporterIP == "" {
-		reporterIP = r.RemoteAddr
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err == nil {
+			reporterIP = host
+		} else {
+			reporterIP = r.RemoteAddr
+		}
+	}
+
+	// Si c'est une IPv6, masquer sur /64 pour éviter le contournement du ban
+	if ip := net.ParseIP(reporterIP); ip != nil {
+		if ip.To4() == nil {
+			// IPv6 -> appliquer masque /64
+			mask := net.CIDRMask(64, 128)
+			reporterIP = ip.Mask(mask).String()
+		}
 	}
 
 	t.mu.Lock()

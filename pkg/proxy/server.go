@@ -174,8 +174,9 @@ func StartProxyServer(node *p2p.Node, listenAddr, carnetPath string) error {
 		}
 		w.WriteHeader(resp.StatusCode)
 
-		// Copy body to client response
-		io.Copy(w, resp.Body)
+		// Copy body to client response with a strict LimitReader to prevent Network Zip Bombs (max 500MB per stream)
+		limitReader := io.LimitReader(resp.Body, 500*1024*1024)
+		io.Copy(w, limitReader)
 	})
 
 	server := &http.Server{

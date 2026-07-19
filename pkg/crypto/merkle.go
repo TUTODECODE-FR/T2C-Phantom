@@ -7,12 +7,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 )
 
 const ChunkSize = 256 * 1024 // 256 Ko
 
+var chunkPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, ChunkSize)
+		return &buf
+	},
+}
+
 // La clé publique "Air-Gapped" ancrée en dur dans le client.
 // Seul le détenteur de la clé privée associée (physiquement isolée) peut publier un nouveau cours.
+// DO NOT STORE THIS ON AN ONLINE MACHINE. MUST BE AIR-GAPPED AND ON AN HSM.
 var MasterOfflinePubKeyHex = "e461a657c4f4544f8087fc7868f7b764c673d317cd7008103c80a0684a0deed7" 
 
 // Manifest (clef.json) structure
@@ -55,7 +64,11 @@ func GenerateManifest(filePath string) (*Manifest, error) {
 	}
 
 	h := sha256.New()
-	buffer := make([]byte, ChunkSize)
+	
+	bufferPtr := chunkPool.Get().(*[]byte)
+	buffer := *bufferPtr
+	defer chunkPool.Put(bufferPtr)
+	
 	var chunkHashes []string
 
 	for {

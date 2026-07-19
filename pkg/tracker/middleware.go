@@ -6,11 +6,15 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
 
-// AntiReplayCache stocke les nonces récemment vus pour éviter les attaques par rejeu
-var antiReplayCache = make(map[string]time.Time)
+var (
+	// AntiReplayCache stocke les nonces récemment vus pour éviter les attaques par rejeu
+	antiReplayCache = make(map[string]time.Time)
+	antiReplayMutex sync.RWMutex
+)
 
 // AuthMiddleware protège les endpoints avec la cryptographie asymétrique (Ed25519) et l'anti-rejeu
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -35,11 +39,17 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// 2. Validation du Nonce (Unicité de la requête)
+		antiReplayMutex.RLock()
 		if _, exists := antiReplayCache[nonce]; exists {
+			antiReplayMutex.RUnlock()
 			http.Error(w, "Nonce already used (Replay Attack Prevention)", http.StatusUnauthorized)
 			return
 		}
+		antiReplayMutex.RUnlock()
+
+		antiReplayMutex.Lock()
 		antiReplayCache[nonce] = time.Now()
+		antiReplayMutex.Unlock()
 
 		// 3. Validation de la Signature Ed25519
 		pubKey, err := base64.StdEncoding.DecodeString(pubKeyB64)
@@ -72,6 +82,8 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 func cleanNonceCache() {
 	now := time.Now()
+	antiReplayMutex.Lock()
+	defer antiReplayMutex.Unlock()
 	for nonce, t := range antiReplayCache {
 		if now.Sub(t) > 5*time.Minute {
 			delete(antiReplayCache, nonce)
