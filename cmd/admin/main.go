@@ -48,7 +48,7 @@ func main() {
 
 		ctx := context.Background()
 		// FOR ADMIN NODE, isRelay IS TRUE! This forces Public reachability for DHT Kademlia!
-		node, err := p2p.NewNode(ctx, privKey, 4001, true, nil)
+		node, err := p2p.NewNode(ctx, privKey, 4001, true, nil, 0, 0)
 		if err != nil {
 			fmt.Println("Failed to start node:", err)
 			return

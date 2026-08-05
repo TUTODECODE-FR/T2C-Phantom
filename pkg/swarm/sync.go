@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	t2ccrypto "t2c/pkg/crypto"
 	"t2c/pkg/utils"
 	"time"
 
@@ -141,10 +142,16 @@ func (sm *SwarmManager) handleStream(stream network.Stream) {
 		}
 	case "get_zip":
 		zipPath := fmt.Sprintf("%s/%s.zip", sm.ZipStorage, req.Key)
-		file, err := os.Open(zipPath)
+		decrypted, err := t2ccrypto.ReadDecryptedFile(zipPath)
 		if err == nil {
-			defer file.Close()
-			io.Copy(stream, file)
+			stream.Write(decrypted)
+		} else {
+			// Fallback si non chiffré
+			file, err := os.Open(zipPath)
+			if err == nil {
+				defer file.Close()
+				io.Copy(stream, file)
+			}
 		}
 	}
 }
@@ -173,8 +180,18 @@ func VerifySiteIntegrity(sm *SwarmManager, pubKeyHash string, record *RoutingRec
 		return fmt.Errorf("local ZIP hash mismatch")
 	}
 
-	// 2. Open ZIP in streaming mode
-	zipReader, err := zip.OpenReader(localZipPath)
+	// 2. Open ZIP in streaming mode (Utilisation de DecryptToTempFile si chiffré)
+	zipPathForReader := localZipPath
+	var cleanup func()
+	if decryptedPath, clean, err := t2ccrypto.DecryptToTempFile(localZipPath); err == nil {
+		zipPathForReader = decryptedPath
+		cleanup = clean
+	} else {
+		cleanup = func() {}
+	}
+	defer cleanup()
+
+	zipReader, err := zip.OpenReader(zipPathForReader)
 	if err != nil {
 		return fmt.Errorf("could not open local zip: %w", err)
 	}

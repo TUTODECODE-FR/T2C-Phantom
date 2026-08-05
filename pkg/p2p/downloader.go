@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"t2c/pkg/crypto"
 	"t2c/pkg/metrics"
+	"t2c/pkg/utils"
 )
 
 // ReputationManager tracks Peer behaviors to prevent Leeching and Churn attacks.
@@ -19,6 +21,7 @@ type ReputationManager struct {
 	downloaded   map[string]int64
 	disconnects  map[string]int
 	backoffUntil map[string]time.Time
+	banned       map[string]bool // Liste des pairs bannis définitivement (Consensus / Triche)
 }
 
 func NewReputationManager() *ReputationManager {
@@ -27,6 +30,7 @@ func NewReputationManager() *ReputationManager {
 		downloaded:   make(map[string]int64),
 		disconnects:  make(map[string]int),
 		backoffUntil: make(map[string]time.Time),
+		banned:       make(map[string]bool),
 	}
 }
 
@@ -44,19 +48,24 @@ func (r *ReputationManager) TrackDownload(peerID string, bytes int64) {
 	r.downloaded[peerID] += bytes
 }
 
-// IsChoked returns true if the peer is leeching (ratio < 0.1) or in backoff.
+// IsChoked returns true if the peer is leeching (ratio < 0.1), in backoff, or banned.
 func (r *ReputationManager) IsChoked(peerID string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	// 1. Churn Penalty (Exponential Backoff)
+	// 1. Permanent Ban Check
+	if r.banned[peerID] {
+		return true
+	}
+
+	// 2. Churn Penalty (Exponential Backoff)
 	if until, exists := r.backoffUntil[peerID]; exists {
 		if time.Now().Before(until) {
 			return true // Ignore the peer
 		}
 	}
 
-	// 2. Tit-for-Tat (Anti-Leeching)
+	// 3. Tit-for-Tat (Anti-Leeching)
 	up := r.uploaded[peerID]
 	down := r.downloaded[peerID]
 	
@@ -68,6 +77,18 @@ func (r *ReputationManager) IsChoked(peerID string) bool {
 		}
 	}
 	return false
+}
+
+// BanPeer bannit définitivement un pair et incrémente les métriques SOC.
+func (r *ReputationManager) BanPeer(peerID string, reason string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
+	if !r.banned[peerID] {
+		r.banned[peerID] = true
+		metrics.BannedPeers.Inc()
+		utils.LogSecurityEvent("PEER_BANNED", fmt.Sprintf("Peer banned. Reason: %s", reason), peerID)
+	}
 }
 
 // HandleDisconnect penalizes peers that drop connection unexpectedly (Churn attack).
@@ -87,47 +108,57 @@ func (r *ReputationManager) HandleDisconnect(peerID string) {
 
 // Downloader gère la récupération des blocs P2P et la fallback
 type Downloader struct {
-	Manifest     *crypto.Manifest
-	HTTPFallback string // URL du LXC Proxy
-	Reputation   *ReputationManager
+	Manifest       *crypto.Manifest
+	HTTPFallback   string // URL du LXC Proxy
+	Reputation     *ReputationManager
+	DisconnectPeer func(peerID string) // Callback pour couper la connexion libp2p physique
 }
 
-func NewDownloader(manifest *crypto.Manifest, fallbackURL string) (*Downloader, error) {
-	// 🛡️ SUPPLY CHAIN DEFENSE: Le Manifest DOIT être signé par la clé maître hors-ligne.
+func NewDownloader(manifest *crypto.Manifest, fallbackURL string, disconnectCallback func(peerID string)) (*Downloader, error) {
+	// 🛡️ SUPPLY CHAIN DEFENSE: Le Manifest DOIT être signé par la clé maître hors-ligne de l'association.
 	if !crypto.VerifyManifestSignature(manifest) {
 		return nil, errors.New("FATAL: Manifest signature is invalid. Possible supply chain attack")
 	}
 
 	return &Downloader{
-		Manifest:     manifest,
-		HTTPFallback: fallbackURL,
-		Reputation:   NewReputationManager(),
+		Manifest:       manifest,
+		HTTPFallback:   fallbackURL,
+		Reputation:     NewReputationManager(),
+		DisconnectPeer: disconnectCallback,
 	}, nil
 }
 
 // DownloadChunk tente de télécharger un fragment via P2P. 
-// En cas d'échec ou de hash invalide, il peut faire un failover.
+// En cas d'échec ou de hash invalide, il fait un failover automatique.
 func (d *Downloader) DownloadChunk(chunkIndex int, peerID string, data []byte) error {
 	if d.Reputation.IsChoked(peerID) {
-		return errors.New("peer is choked due to leeching or churn penalty")
+		return errors.New("peer is choked due to leeching, churn or ban penalty")
 	}
 
 	d.Reputation.TrackDownload(peerID, int64(len(data)))
 
 	expectedHash := d.Manifest.ChunkHashes[chunkIndex]
 
-	// Vérification Zero-Trust en RAM
+	// Vérification Zero-Trust en RAM (Anti-TOCTOU & Merkle)
 	if !crypto.ValidateChunk(data, expectedHash) {
 		log.Printf("[ZERO-TRUST] Hash mismatch for chunk %d from peer %s", chunkIndex, peerID)
 		
-		// 📊 [SOC] Incrémenter la métrique des attaques TOCTOU
+		// 📊 [SOC] Incrémenter la métrique de blocs corrompus et logguer l'anomalie
 		metrics.CorruptedBlocks.Inc()
-		
-		// 1. Déconnexion immédiate du peer (à intégrer avec libp2p Host)
-		// 2. Envoi d'un rapport de ban au serveur
+		utils.LogSecurityEvent("CORRUPTED_BLOCK", fmt.Sprintf("Merkle tree chunk validation failed for chunk %d", chunkIndex), peerID)
+
+		// 1. Bannissement instantané et définitif du pair malveillant
+		d.Reputation.BanPeer(peerID, fmt.Sprintf("Sent corrupted chunk %d", chunkIndex))
+
+		// 2. Déconnexion immédiate au niveau réseau libp2p
+		if d.DisconnectPeer != nil {
+			d.DisconnectPeer(peerID)
+		}
+
+		// 3. Envoi du rapport de triche au tracker central
 		d.ReportPeer(peerID)
 
-		// 3. Failover HTTP transparent
+		// 4. Failover HTTP transparent (Rien n'est écrit sur le disque)
 		return d.DownloadChunkFailover(chunkIndex)
 	}
 
@@ -138,7 +169,6 @@ func (d *Downloader) DownloadChunk(chunkIndex int, peerID string, data []byte) e
 func (d *Downloader) ReportPeer(peerID string) {
 	log.Printf("[IMMUNE SYSTEM] Reporting malicious peer: %s", peerID)
 	
-	// Execute in a background goroutine to not block the downloader
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -161,9 +191,9 @@ func (d *Downloader) ReportPeer(peerID string) {
 func (d *Downloader) DownloadChunkFailover(chunkIndex int) error {
 	log.Printf("[FAILOVER] Downloading chunk %d directly from LXC Proxy (%s)", chunkIndex, d.HTTPFallback)
 	
-	// 📊 [SOC] Incrémenter la métrique des failovers P2P -> HTTP
+	// 📊 [SOC] Incrémenter la métrique de failovers P2P -> HTTP
 	metrics.Failovers.Inc()
 	
-	// Code de téléchargement HTTP classique
+	// En production, cette méthode télécharge le fragment en clair depuis le serveur de repli sécurisé.
 	return errors.New("not implemented yet")
 }

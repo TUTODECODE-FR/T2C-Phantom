@@ -14,12 +14,14 @@ func TestTrackerImmuneSystem(t *testing.T) {
 	tracker := NewTracker(3)
 	
 	// Utilisation de 127.0.0.1 (IPv4) au lieu de ::1 pour la compatibilité avec GitLab CI et Docker
-	server := httptest.NewUnstartedServer(http.HandlerFunc(tracker.HandleReportPeer))
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	server.Listener = l
+	server := &httptest.Server{
+		Listener: l,
+		Config:   &http.Server{Handler: http.HandlerFunc(tracker.HandleReportPeer)},
+	}
 	server.Start()
 	defer server.Close()
 

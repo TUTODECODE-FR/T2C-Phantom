@@ -112,7 +112,7 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	d.cancelNode = cancel
 
-	node, err := p2p.NewNode(ctx, priv, 0, false, nil)
+	node, err := p2p.NewNode(ctx, priv, 0, false, nil, 0, 0)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

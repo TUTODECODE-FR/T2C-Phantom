@@ -10,7 +10,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	t2ccrypto "t2c/pkg/crypto"
 )
 
 type RoutingRecord struct {
@@ -19,7 +20,7 @@ type RoutingRecord struct {
 	Signature string `json:"signature"`
 }
 
-func (r *RoutingRecord) Sign(priv crypto.PrivKey) error {
+func (r *RoutingRecord) Sign(priv libp2pcrypto.PrivKey) error {
 	data := fmt.Sprintf("%d:%s", r.Timestamp, r.ZipHash)
 	sig, err := priv.Sign([]byte(data))
 	if err != nil {
@@ -29,7 +30,7 @@ func (r *RoutingRecord) Sign(priv crypto.PrivKey) error {
 	return nil
 }
 
-func (r *RoutingRecord) Verify(pub crypto.PubKey) (bool, error) {
+func (r *RoutingRecord) Verify(pub libp2pcrypto.PubKey) (bool, error) {
 	data := fmt.Sprintf("%d:%s", r.Timestamp, r.ZipHash)
 	sigBytes, err := base64.StdEncoding.DecodeString(r.Signature)
 	if err != nil {
@@ -52,6 +53,12 @@ func HashReader(r io.Reader) (string, error) {
 }
 
 func HashLocalFile(path string) (string, error) {
+	// Tente de déchiffrer en mémoire pour calculer le hash du fichier d'origine
+	decrypted, err := t2ccrypto.ReadDecryptedFile(path)
+	if err == nil {
+		return HashFileBytes(decrypted), nil
+	}
+	
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -60,7 +67,7 @@ func HashLocalFile(path string) (string, error) {
 	return HashReader(f)
 }
 
-func CreateRecord(priv crypto.PrivKey, zipBytes []byte) (*RoutingRecord, error) {
+func CreateRecord(priv libp2pcrypto.PrivKey, zipBytes []byte) (*RoutingRecord, error) {
 	hash := HashFileBytes(zipBytes)
 	record := &RoutingRecord{
 		Timestamp: time.Now().Unix(),

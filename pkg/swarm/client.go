@@ -152,8 +152,10 @@ func performSync(ctx context.Context, sm *SwarmManager, h host.Host, pubKeyHash,
 			} else {
 				// We already have this VALID zip. Let's make sure it's extracted.
 				if _, err := os.Stat(filepath.Join(siteDir, "index.html")); err != nil {
-					// We need the bytes to pass to UnzipDirectory which still takes []byte
-					if downloadedBytes, err := os.ReadFile(localZipPath); err == nil {
+					// Utilisation du déchiffrement transparent
+					if downloadedBytes, err := crypto.ReadDecryptedFile(localZipPath); err == nil {
+						UnzipDirectory(downloadedBytes, siteDir)
+					} else if downloadedBytes, err := os.ReadFile(localZipPath); err == nil {
 						UnzipDirectory(downloadedBytes, siteDir)
 					}
 				}
@@ -182,22 +184,26 @@ func performSync(ctx context.Context, sm *SwarmManager, h host.Host, pubKeyHash,
 	stream.Write(reqBytes)
 	stream.Write([]byte("\n"))
 
-	zipFile, err := os.Create(localZipPath)
+	// Lecture sécurisée du flux (limite de 500 Mo pour contrer les Zip Bombs réseau)
+	limitStream := io.LimitReader(stream, 500*1024*1024)
+	downloadedBytes, err := io.ReadAll(limitStream)
 	if err != nil {
 		return err
 	}
-	io.Copy(zipFile, stream)
-	zipFile.Close()
 
-	// 5. Verify Hash
-	downloadedBytes, _ := os.ReadFile(localZipPath)
+	// Validation du hash du binaire brut reçu
 	actualHash := HashFileBytes(downloadedBytes)
 	if actualHash != record.ZipHash {
-		os.Remove(localZipPath)
 		return fmt.Errorf("Security Error: ZIP Hash mismatch! Expected %s, got %s", record.ZipHash, actualHash)
 	}
 
-	// 6. Extract
+	// Écriture chiffrée sur le disque (Data-at-rest encryption)
+	err = crypto.WriteEncryptedFile(localZipPath, downloadedBytes)
+	if err != nil {
+		return err
+	}
+
+	// 6. Extraction du contenu ZIP déchiffré en mémoire
 	UnzipDirectory(downloadedBytes, siteDir)
 	
 	// Save the record to the site directory

@@ -74,7 +74,7 @@ func (n *discoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	n.h.Connect(context.Background(), pi)
 }
 
-func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRelay bool, staticRelays []string) (*Node, error) {
+func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRelay bool, staticRelays []string, maxPeers int, maxMemory int64) (*Node, error) {
 	var idht *dht.IpfsDHT
 
 	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", listenPort) // tcp/4001
@@ -102,6 +102,7 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 	// 🛡️ FD/Connection Exhaustion Prevention (Anti Slow-Read)
 	limits := rcmgr.DefaultLimits
 	libp2p.SetDefaultServiceLimits(&limits)
+
 	limits.AddServiceLimit("t2c", rcmgr.BaseLimit{
 		Streams:         128,
 		StreamsInbound:  64,
@@ -112,7 +113,18 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 		FD:              16, // Max File Descriptors per service
 	}, rcmgr.BaseLimitIncrease{})
 
-	limiter := rcmgr.NewFixedLimiter(limits.AutoScale())
+	var partialLimits rcmgr.PartialLimitConfig
+	if maxMemory > 0 {
+		partialLimits.System.Memory = rcmgr.LimitVal64(maxMemory)
+	}
+	if maxPeers > 0 {
+		partialLimits.System.Conns = rcmgr.LimitVal(maxPeers)
+		partialLimits.System.ConnsInbound = rcmgr.LimitVal(maxPeers / 2)
+		partialLimits.System.ConnsOutbound = rcmgr.LimitVal(maxPeers / 2)
+	}
+
+	concreteLimits := partialLimits.Build(limits.AutoScale())
+	limiter := rcmgr.NewFixedLimiter(concreteLimits)
 	
 	rm, err := rcmgr.NewResourceManager(limiter)
 	if err != nil {

@@ -146,7 +146,7 @@ T2C Phantom a été conçu pour l'efficacité et la légèreté, afin de tourner
 
 ## 🚀 Guide Rapide : Installation et Utilisation
 
-Le projet est conçu pour être compilé depuis les sources afin de garantir une intégrité totale. Assurez-vous d'avoir **Go 1.26+** installé.
+Le projet est conçu pour être compilé depuis les sources ou installé via des scripts automatisés. Assurez-vous d'avoir **Go 1.26+** installé.
 
 ### 1. Cloner et Compiler
 ```bash
@@ -155,24 +155,46 @@ cd T2C-Phantom
 go build -v -o t2c ./cmd/t2c
 ```
 
-### 2. Démarrer le Nœud Local
-Ouvrez votre terminal dans le dossier contenant l'exécutable et lancez le démon. Pour vous connecter au réseau en traversant les NAT, utilisez le relais public :
-
+### 2. Initialisation & Diagnostic (Recommandé)
+Avant de lancer le démon, initialisez votre configuration et vérifiez l'état de votre système :
 ```bash
-# Sur Mac/Linux :
-./t2c start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
+# Lancer l'assistant interactif de configuration
+./t2c init
 
-# Sur Windows :
-t2c.exe start --proxy 8080 --use-relay /ip4/20.244.4.32/tcp/443/wss/p2p/12D3KooWBEK7H1KXCgpUbD4pFeGJVjVoFfUhnwPH1ywvsTbn6BBr
+# Lancer le diagnostic système (Ports, I2P SAM, DNS)
+./t2c doctor
 ```
 
-### 2. Naviguer sur le réseau T2C
-Laissez le terminal ouvert. Votre machine dispose désormais d'un accès au sous-réseau via le proxy local `127.0.0.1:8080`. 
+### 3. Installation en tant que Service Système (Arrière-plan permanent)
+Pour exécuter T2C-Phantom comme un service persistant qui redémarre automatiquement en cas de crash :
 
-Si vous disposez de l'annuaire `carnet.json`, vous pouvez interroger les nœuds de manière transparente :
+*   **Sur Linux & macOS (Unix)** :
+    ```bash
+    sudo chmod +x install.sh
+    sudo ./install.sh
+    ```
+    *Le script installera automatiquement un service Systemd sur Linux ou un agent Launchd sur macOS.*
+
+*   **Sur Windows** (Exécuter dans une console PowerShell en Administrateur) :
+    ```powershell
+    Set-ExecutionPolicy Bypass -Scope Process
+    .\install.ps1
+    ```
+    *Le script installera le démon en tâche d'arrière-plan persistante.*
+
+### 4. Lancement Manuel (CLI)
+Si vous préférez lancer manuellement le démon avec la console interactive TUI :
 ```bash
-curl -x http://localhost:8080 http://tutodecode.t2c
+./t2c start --proxy 8080 --metrics-port 2112 --vault-pass "MaClefChiffrement"
 ```
+
+### 5. Déploiement SOC "One-Click" (Supervision Prometheus / Grafana)
+Pour monitorer l'état de sécurité de vos conteneurs LXC et relais en direct :
+```bash
+cd deploy/soc
+docker compose up -d
+```
+*Le tableau de bord Grafana de sécurité est accessible sur http://localhost:3000 (identifiants: admin / admin).*
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 

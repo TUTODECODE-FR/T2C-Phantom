@@ -30,7 +30,7 @@ func TestDownloaderZeroTrustFailover(t *testing.T) {
 	sig := ed25519.Sign(privKey, message)
 	manifest.Signature = hex.EncodeToString(sig)
 
-	downloader, err := NewDownloader(manifest, "http://localhost:8080")
+	downloader, err := NewDownloader(manifest, "http://localhost:8080", func(peerID string) {})
 	if err != nil {
 		t.Fatalf("Expected valid signature but got error: %v", err)
 	}
