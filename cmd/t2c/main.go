@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -29,8 +28,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialisation du Logger de sécurité
-	utils.InitSecurityLogger("data/security.log")
+	// Initialisation du Logger de sécurité dans le bon dossier OS-specific
+	utils.InitSecurityLogger(utils.GetPath("security.log"))
 
 	cmd := os.Args[1]
 
@@ -71,7 +70,7 @@ func main() {
 		port := startCmd.Int("port", 4001, "P2P Listen Port")
 		proxyPort := startCmd.Int("proxy", 0, "HTTP Proxy Listen Port (e.g., 8080)")
 		bootstrap := startCmd.String("bootstrap", "", "Comma-separated bootstrap peers")
-		carnetPath := startCmd.String("carnet", "data/carnet.json", "Path to the carnet.json file for DNS aliases")
+		carnetPath := startCmd.String("carnet", utils.GetPath("carnet.json"), "Path to the carnet.json file for DNS aliases")
 		relaysStr := startCmd.String("relays", "", "Comma-separated list of Relays (multiaddrs) to mask IP and ensure high availability")
 
 		// Nouveaux drapeaux durcissement Phase 8.1
@@ -243,7 +242,7 @@ func runDoctorCommand() {
 
 	// 4. Intégrité des répertoires de cache
 	fmt.Print("[*] Intégrité de l'arborescence locale de cache... ")
-	cachePath := filepath.Join("data", "swarm_zips")
+	cachePath := utils.GetPath("swarm_zips")
 	_ = os.MkdirAll(cachePath, 0700)
 	if _, err := os.Stat(cachePath); err == nil {
 		fmt.Println("✅ OK")

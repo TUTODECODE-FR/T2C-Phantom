@@ -8,11 +8,11 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 
 	"golang.org/x/crypto/pbkdf2"
+	"t2c/pkg/utils"
 )
 
 const (
@@ -46,14 +46,14 @@ func GetMachineUUID() string {
 	// Si aucun identifiant matériel n'est trouvé (macOS/Windows sans privilèges ou Linux altéré),
 	// on utilise un fichier de clé d'ancrage local pour sécuriser le stockage local.
 	if id == "" {
-		keyPath := filepath.Join("data", "machine.key")
+		keyPath := utils.GetPath("machine.key")
 		if data, err := os.ReadFile(keyPath); err == nil {
 			id = strings.TrimSpace(string(data))
 		} else {
 			// Génération d'une clé d'ancrage unique si elle n'existe pas
 			token := make([]byte, 32)
 			if _, err := rand.Read(token); err == nil {
-				_ = os.MkdirAll("data", 0700)
+				_ = os.MkdirAll(utils.GetT2CDataDir(), 0700)
 				_ = os.WriteFile(keyPath, token, 0600)
 				id = string(token)
 			} else {

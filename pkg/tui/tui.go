@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
+	"t2c/pkg/utils"
 	"time"
 )
 
@@ -80,8 +80,8 @@ func RunInitWizard() {
 	}
 
 	// Sauvegarde
-	_ = os.MkdirAll("data", 0700)
-	configPath := filepath.Join("data", "config.json")
+	_ = os.MkdirAll(utils.GetT2CDataDir(), 0700)
+	configPath := utils.GetPath("config.json")
 	file, err := os.Create(configPath)
 	if err == nil {
 		defer file.Close()

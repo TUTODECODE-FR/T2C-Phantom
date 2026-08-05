@@ -26,6 +26,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"t2c/pkg/onion"
 	"t2c/pkg/swarm"
+	"t2c/pkg/utils"
 )
 
 // getPublicIP fetches the machine's public IP. Returns empty string on failure.
@@ -202,7 +203,7 @@ func NewNode(ctx context.Context, privKey crypto.PrivKey, listenPort int, isRela
 		DHT:  idht,
 	}
 
-	n.SwarmManager = swarm.NewSwarmManager(h, idht, "data/swarm_zips")
+	n.SwarmManager = swarm.NewSwarmManager(h, idht, utils.GetPath("swarm_zips"))
 
 	// Register this node to be an Onion Relay on the network
 	onion.RegisterOnionRelay(h, func() int { return n.ExitPort })

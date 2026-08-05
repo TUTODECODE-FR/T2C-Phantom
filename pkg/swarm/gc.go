@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"t2c/pkg/utils"
 	"time"
 )
 
@@ -27,7 +28,7 @@ func (sm *SwarmManager) StartGarbageCollector(maxBytes, targetBytes int64, check
 }
 
 func (sm *SwarmManager) RunGC(maxBytes, targetBytes int64) {
-	sitesDir := filepath.Join("data", "sites")
+	sitesDir := filepath.Join(utils.GetT2CDataDir(), "sites")
 	var totalSize int64
 	var sites []SiteUsage
 

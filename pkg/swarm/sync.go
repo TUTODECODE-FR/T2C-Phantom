@@ -59,7 +59,7 @@ func NewSwarmManager(h host.Host, d *dht.IpfsDHT, zipStorage string) *SwarmManag
 
 	// Load and seed existing sites in the background
 	go func() {
-		sitesDir := filepath.Join("data", "sites")
+		sitesDir := filepath.Join(utils.GetT2CDataDir(), "sites")
 		entries, err := os.ReadDir(sitesDir)
 		if err != nil {
 			return
@@ -197,7 +197,7 @@ func VerifySiteIntegrity(sm *SwarmManager, pubKeyHash string, record *RoutingRec
 	}
 	defer zipReader.Close()
 
-	siteDir := filepath.Join("data", "sites", pubKeyHash)
+	siteDir := filepath.Join(utils.GetT2CDataDir(), "sites", pubKeyHash)
 	
 	// Create a map to track which files are in the zip
 	zipFiles := make(map[string]bool)
@@ -289,7 +289,7 @@ func (sm *SwarmManager) AnnounceSite(ctx context.Context, pubKeyHash string) err
 			
 			// Delete corrupted files
 			os.Remove(filepath.Join(sm.ZipStorage, record.ZipHash+".zip"))
-			os.RemoveAll(filepath.Join("data", "sites", pubKeyHash))
+			os.RemoveAll(filepath.Join(utils.GetT2CDataDir(), "sites", pubKeyHash))
 			
 			sm.Mutex.Lock()
 			delete(sm.Records, pubKeyHash)

@@ -14,10 +14,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"t2c/pkg/crypto"
+	"t2c/pkg/utils"
 )
 
 func SyncSite(ctx context.Context, sm *SwarmManager, h host.Host, pubKeyHash string) (string, error) {
-	siteDir := filepath.Join("data", "sites", pubKeyHash)
+	siteDir := filepath.Join(utils.GetT2CDataDir(), "sites", pubKeyHash)
 	os.MkdirAll(siteDir, 0755)
 
 	// Update mtime for LRU Garbage Collector
