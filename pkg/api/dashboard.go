@@ -13,6 +13,7 @@ import (
 	"t2c/pkg/crypto"
 	"t2c/pkg/p2p"
 	"t2c/pkg/proxy"
+	"t2c/pkg/utils"
 )
 
 type Dashboard struct {
@@ -162,7 +163,7 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 
 	proxyAddr := "127.0.0.1:8080"
 	d.proxyPort = 8080
-	go proxy.StartProxyServer(node, proxyAddr, "data/carnet.json")
+	go proxy.StartProxyServer(node, proxyAddr, utils.GetPath("carnet.json"))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
