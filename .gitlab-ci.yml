@@ -34,30 +34,30 @@ build_linux:
   stage: build
   script:
     - echo "Compilation du binaire Linux (Statique)..."
-    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o build/t2c-linux-amd64 ./cmd/t2c/main.go
+    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o t2c-linux-amd64 ./cmd/t2c/main.go
   artifacts:
     paths:
-      - build/t2c-linux-amd64
+      - t2c-linux-amd64
     expire_in: 1 week
 
 build_windows:
   stage: build
   script:
     - echo "Compilation du binaire Windows..."
-    - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o build/t2c-windows-amd64.exe ./cmd/t2c/main.go
+    - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-w -s" -o t2c-windows-amd64.exe ./cmd/t2c/main.go
   artifacts:
     paths:
-      - build/t2c-windows-amd64.exe
+      - t2c-windows-amd64.exe
     expire_in: 1 week
 
 build_mac_arm64:
   stage: build
   script:
     - echo "Compilation du binaire macOS (Apple Silicon)..."
-    - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-w -s" -o build/t2c-mac-arm64 ./cmd/t2c/main.go
+    - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-w -s" -o t2c-mac-arm64 ./cmd/t2c/main.go
   artifacts:
     paths:
-      - build/t2c-mac-arm64
+      - t2c-mac-arm64
     expire_in: 1 week
 
 # ---------------------------------------------------------

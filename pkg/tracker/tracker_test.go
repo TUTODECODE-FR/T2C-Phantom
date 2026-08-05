@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"bytes"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +12,15 @@ import (
 func TestTrackerImmuneSystem(t *testing.T) {
 	// Seuil de 3 IPs pour bannir
 	tracker := NewTracker(3)
-	server := httptest.NewServer(http.HandlerFunc(tracker.HandleReportPeer))
+	
+	// Utilisation de 127.0.0.1 (IPv4) au lieu de ::1 pour la compatibilité avec GitLab CI et Docker
+	server := httptest.NewUnstartedServer(http.HandlerFunc(tracker.HandleReportPeer))
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.Listener = l
+	server.Start()
 	defer server.Close()
 
 	maliciousPeer := "QmFakeMaliciousPeerID123"
