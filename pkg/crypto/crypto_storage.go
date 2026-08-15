@@ -16,17 +16,17 @@ import (
 )
 
 const (
-	saltSize   = 16
 	keySize    = 32 // AES-256
-	iterations = 10000
+	iterations = 100000
 )
 
 // VaultPassphrase est la clé globale configurée au démarrage pour le chiffrement au repos.
 // Si elle reste vide, GetMachineUUID() sera utilisé comme clé de repli locale.
 var VaultPassphrase string
 
-// DeriveKey dérive une clé AES-256 à partir d'un mot de passe et d'un sel
-func DeriveKey(passphrase string, salt []byte) []byte {
+// DeriveKey dérive une clé AES-256 à partir d'un mot de passe et d'un sel fixe (pour correspondre au client Dart)
+func DeriveKey(passphrase string) []byte {
+	salt := []byte("t2c-phantom-salt")
 	return pbkdf2.Key([]byte(passphrase), salt, iterations, keySize, sha256.New)
 }
 
@@ -74,12 +74,7 @@ func GetEffectivePassphrase() string {
 
 // EncryptData chiffre des données avec AES-256-GCM
 func EncryptData(data []byte, passphrase string) ([]byte, error) {
-	salt := make([]byte, saltSize)
-	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
-		return nil, err
-	}
-
-	key := DeriveKey(passphrase, salt)
+	key := DeriveKey(passphrase)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -95,10 +90,9 @@ func EncryptData(data []byte, passphrase string) ([]byte, error) {
 		return nil, err
 	}
 
-	// Format de sortie : [Salt (16B)] [Nonce (12B)] [Ciphertext (Variable)]
+	// Format de sortie : [Nonce (12B)] [Ciphertext + Tag (Variable)]
 	encrypted := gcm.Seal(nil, nonce, data, nil)
-	result := make([]byte, 0, len(salt)+len(nonce)+len(encrypted))
-	result = append(result, salt...)
+	result := make([]byte, 0, len(nonce)+len(encrypted))
 	result = append(result, nonce...)
 	result = append(result, encrypted...)
 
@@ -107,15 +101,14 @@ func EncryptData(data []byte, passphrase string) ([]byte, error) {
 
 // DecryptData déchiffre des données avec AES-256-GCM
 func DecryptData(ciphertext []byte, passphrase string) ([]byte, error) {
-	if len(ciphertext) < saltSize+12 { // Salt + Nonce minimum
+	if len(ciphertext) < 12+16 { // Nonce (12B) + Tag (16B) minimum
 		return nil, errors.New("ciphertext too short")
 	}
 
-	salt := ciphertext[:saltSize]
-	nonce := ciphertext[saltSize : saltSize+12]
-	actualCiphertext := ciphertext[saltSize+12:]
+	nonce := ciphertext[:12]
+	actualCiphertext := ciphertext[12:]
 
-	key := DeriveKey(passphrase, salt)
+	key := DeriveKey(passphrase)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -124,10 +117,6 @@ func DecryptData(ciphertext []byte, passphrase string) ([]byte, error) {
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
-	}
-
-	if len(nonce) != gcm.NonceSize() {
-		return nil, errors.New("invalid nonce size")
 	}
 
 	decrypted, err := gcm.Open(nil, nonce, actualCiphertext, nil)
