@@ -232,6 +232,32 @@ v1.4
 - Bridging avec le réseau local (Mesh hybride LAN/WAN).
 ```
 
+## 💖 Soutenir le Projet (Donation)
+
+T2C-Phantom et T2DECODE sont développés de manière indépendante et à but non lucratif. Si vous appréciez notre démarche d'éducation souveraine et sans traçage, vous pouvez soutenir notre association loi 1901 :
+
+[![Soutenir TUTODECODE sur Liberapay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/tutodecode/donate)
+
+### Indicateurs de l'Association sur LiberaPay
+
+<div align="center">
+  <a href="https://liberapay.com/tutodecode/donate">
+    <img alt="Reçoit sur Liberapay" src="https://img.shields.io/liberapay/receives/tutodecode.svg?logo=liberapay">
+  </a>
+  <a href="https://liberapay.com/tutodecode/donate">
+    <img alt="Patrons sur Liberapay" src="https://img.shields.io/liberapay/patrons/tutodecode.svg?logo=liberapay">
+  </a>
+  <a href="https://liberapay.com/tutodecode/donate">
+    <img alt="Objectif sur Liberapay" src="https://img.shields.io/liberapay/goal/tutodecode.svg?logo=liberapay">
+  </a>
+</div>
+
+### Liens Liberapay
+*   [Profil Principal](https://liberapay.com/tutodecode/)
+*   [Faire un don direct](https://liberapay.com/tutodecode/donate)
+*   [Widget d'encaissements](https://liberapay.com/tutodecode/receiving)
+*   [Widget de dons](https://liberapay.com/tutodecode/giving)
+
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
 ## 🏛️ L'Association TUTODECODE (Mentions Légales)
