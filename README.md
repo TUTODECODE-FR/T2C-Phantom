@@ -44,11 +44,12 @@ Alors qu'il existe déjà des réseaux éprouvés comme IPFS, Tor, ou BitTorrent
 ## ⚠️ PROPRIÉTÉ INTELLECTUELLE & LICENCE
 > [!WARNING]
 > **PROPRIÉTÉ INTELLECTUELLE & LICENCE**
-> Ce dépôt est "Source-Available" (Auditable) mais n'est PAS Open Source. Le code de T2C Phantom est maintenu sous propriété intellectuelle stricte (**Tous droits réservés**). 
-> L'utilisation, la modification, la distribution ou l'intégration commerciale de ce moteur réseau par des entités tierces est **formellement interdite** sans accord écrit de TUTODECODE.
+> Ce dépôt public publie le **client** (daemon) en source-available : vous pouvez l'auditer et prouver l'absence de porte dérobée. **Ce n'est PAS open source** (pas GPLv3, pas MIT). Tous droits réservés TUTODECODE.
+> Le **code serveur / relais** n'est pas publié, pour des raisons de sécurité (nœuds empoisonnés / Sybil, topologie).
+> Utilisation, modification, distribution ou intégration commerciale par un tiers : **interdites** sans accord écrit de TUTODECODE.
 
 **Pourquoi cette protection (Transparence Hybride) ?**
-La mécanique côté client est auditable pour prouver l'absence de portes dérobées. En revanche, le code source des Relais publics est gardé confidentiel. Ce choix vise à mitiger la rétro-ingénierie par des acteurs malveillants souhaitant créer des nœuds empoisonnés (Attaques Sybil) et préserver l'intégrité de la topologie.
+La mécanique côté client est publique pour l'audit. Le relais reste privé pour limiter la rétro-ingénierie et les nœuds malveillants.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
