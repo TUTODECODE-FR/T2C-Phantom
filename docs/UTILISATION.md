@@ -16,9 +16,11 @@ Get-FileHash T2C-Phantom-Windows-amd64.zip       # Windows
 
 | Système | Installation |
 |---|---|
-| macOS | dézippe, glisse **T2C Phantom** dans Applications ; premier lancement : clic droit → **Ouvrir** → Ouvrir |
-| Windows | dézippe, lance `T2C-Phantom.exe` ; si SmartScreen s'affiche : « Informations complémentaires » → **Exécuter quand même** |
-| Linux | `tar xzf T2C-Phantom-Linux-amd64.tar.gz` puis `./T2C-Phantom` ; prérequis : `sudo apt install libwebkit2gtk-4.1-0 libnss3-tools` (Debian/Ubuntu) |
+| macOS | dézippe et ouvre **T2C Phantom** (premier lancement : clic droit → **Ouvrir** → Ouvrir). L'application propose de se **déplacer dans Applications**. |
+| Windows | dézippe et lance `T2C-Phantom.exe` (si SmartScreen s'affiche : « Informations complémentaires » → **Exécuter quand même**). L'application propose de **s'installer** dans `%LocalAppData%\Programs\T2C Phantom`, avec un raccourci sur le **Bureau** et dans le **menu Démarrer**. |
+| Linux | `tar xzf T2C-Phantom-Linux-amd64.tar.gz` puis `./T2C-Phantom` (prérequis : `sudo apt install libwebkit2gtk-4.1-0 libnss3-tools` sur Debian/Ubuntu). L'application propose de **s'installer** dans `~/.local/bin`, avec une entrée dans le menu et un raccourci sur le Bureau. |
+
+Pour ne plus voir cette proposition : bouton « Ne plus demander » sur macOS, ou variable `T2C_NO_INSTALL_PROMPT=1`.
 
 ### Premier lancement
 

@@ -42,6 +42,8 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 10, G: 10, B: 10, A: 255},
 		OnShutdown:       func(context.Context) { d.Shutdown() },
+		// premier lancement : proposer l'installation (Applications / Bureau / menu)
+		OnDomReady: func(ctx context.Context) { go offerInstall(ctx) },
 		Mac: &mac.Options{
 			About: &mac.AboutInfo{
 				Title:   "T2C Phantom " + version,
