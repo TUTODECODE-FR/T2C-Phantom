@@ -54,17 +54,19 @@ type HostsList struct {
 	Issued    int64       `json:"issued"`
 	Hosts     []HostEntry `json:"hosts"`
 	Banned    []string    `json:"banned"`
-	Bootstrap []string    `json:"bootstrap"` // multiaddrs infra (VPS) uniquement
+	Bootstrap []string    `json:"bootstrap"`       // multiaddrs infra (VPS) uniquement
+	Deleg     *Delegation `json:"deleg,omitempty"` // signée par une clé de service déléguée
 	Sig       string      `json:"sig"`
 }
 
 // Ticket : autorisation signée pour qu'un pair héberge une version d'un site.
 type Ticket struct {
-	Peer    string `json:"peer"`
-	Site    string `json:"site"`
-	Root    string `json:"root"`
-	Expires int64  `json:"expires"`
-	Sig     string `json:"sig"`
+	Peer    string      `json:"peer"`
+	Site    string      `json:"site"`
+	Root    string      `json:"root"`
+	Expires int64       `json:"expires"`
+	Deleg   *Delegation `json:"deleg,omitempty"`
+	Sig     string      `json:"sig"`
 }
 
 func (t *Ticket) Valid(now time.Time) bool { return now.Unix() < t.Expires }
@@ -144,10 +146,21 @@ func (h *HostsList) Sign(priv ed25519.PrivateKey) error {
 	return err
 }
 
-func (h *HostsList) Verify(pub ed25519.PublicKey) error {
+// SignDelegated : signature par la clé de service, délégation jointe.
+func (h *HostsList) SignDelegated(priv ed25519.PrivateKey, d *Delegation) error {
+	h.Deleg = d
+	return h.Sign(priv)
+}
+
+// Verify : root = clé racine. Accepte la racine ou une clé de service déléguée (portée hosts).
+func (h *HostsList) Verify(root ed25519.PublicKey) error {
+	k, err := signerKey(root, h.Deleg, ScopeHosts)
+	if err != nil {
+		return err
+	}
 	u := *h
 	u.Sig = ""
-	return verify(pub, domHosts, u, h.Sig)
+	return verify(k, domHosts, u, h.Sig)
 }
 
 // IsBanned : pair présent dans la liste des bannis.
@@ -178,10 +191,20 @@ func (t *Ticket) Sign(priv ed25519.PrivateKey) error {
 	return err
 }
 
-func (t *Ticket) Verify(pub ed25519.PublicKey) error {
+func (t *Ticket) SignDelegated(priv ed25519.PrivateKey, d *Delegation) error {
+	t.Deleg = d
+	return t.Sign(priv)
+}
+
+// Verify : root = clé racine. Accepte la racine ou une clé de service déléguée (portée ticket).
+func (t *Ticket) Verify(root ed25519.PublicKey) error {
+	k, err := signerKey(root, t.Deleg, ScopeTicket)
+	if err != nil {
+		return err
+	}
 	u := *t
 	u.Sig = ""
-	return verify(pub, domTicket, u, t.Sig)
+	return verify(k, domTicket, u, t.Sig)
 }
 
 func isHexHash(s string) bool {

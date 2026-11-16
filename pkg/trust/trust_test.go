@@ -113,3 +113,56 @@ func TestKeyFile(t *testing.T) {
 		t.Fatal("ticket valide")
 	}
 }
+
+func TestDelegation(t *testing.T) {
+	rootPub, rootPriv := keys(t)
+	svcPub, svcPriv := keys(t)
+	_, otherPriv := keys(t)
+
+	d, err := NewDelegation(rootPriv, svcPub, time.Hour, ScopeHosts, ScopeTicket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk := &Ticket{Peer: "p", Site: "s", Root: "r", Expires: time.Now().Add(time.Hour).Unix()}
+	if err := tk.SignDelegated(svcPriv, d); err != nil {
+		t.Fatal(err)
+	}
+	if err := tk.Verify(rootPub); err != nil {
+		t.Fatalf("ticket délégué refusé: %v", err)
+	}
+	h := &HostsList{Version: 1}
+	if err := h.SignDelegated(svcPriv, d); err != nil || h.Verify(rootPub) != nil {
+		t.Fatal("hosts délégué refusé")
+	}
+
+	// clé non déléguée qui se fait passer pour le service
+	forged := *tk
+	_ = forged.SignDelegated(otherPriv, d)
+	if forged.Verify(rootPub) == nil {
+		t.Fatal("signature par une clé non déléguée acceptée")
+	}
+	// délégation auto-signée par un attaquant
+	fake, _ := NewDelegation(otherPriv, svcPub, time.Hour, ScopeHosts, ScopeTicket)
+	tk2 := *tk
+	_ = tk2.SignDelegated(svcPriv, fake)
+	if tk2.Verify(rootPub) == nil {
+		t.Fatal("délégation non signée par la racine acceptée")
+	}
+	// portée : délégation « ticket » seule ne signe pas hosts
+	dt, _ := NewDelegation(rootPriv, svcPub, time.Hour, ScopeTicket)
+	h2 := &HostsList{Version: 2}
+	_ = h2.SignDelegated(svcPriv, dt)
+	if h2.Verify(rootPub) == nil {
+		t.Fatal("portée de délégation ignorée")
+	}
+	// expiration
+	exp := *d
+	exp.Expires = time.Now().Add(-time.Second).Unix()
+	if _, err := exp.ServiceKey(rootPub, ScopeHosts, time.Now()); err == nil {
+		t.Fatal("délégation expirée acceptée")
+	}
+	// durée excessive refusée
+	if _, err := NewDelegation(rootPriv, svcPub, 365*24*time.Hour, ScopeHosts); err == nil {
+		t.Fatal("délégation d'un an acceptée")
+	}
+}

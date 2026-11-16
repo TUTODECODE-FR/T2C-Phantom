@@ -42,6 +42,10 @@ const (
 	MaxMessage = 3 + MaxHeader + MaxPayload
 )
 
+// Subprotocol : sous-protocole WebSocket exigé par le relais. Toute connexion
+// qui ne l'annonce pas est refusée avant même l'ouverture de la WebSocket.
+const Subprotocol = "t2c.v2"
+
 // HelloPayload : ce que le pair signe pour prouver qu'il détient sa clé.
 func HelloPayload(nonce []byte) []byte { return append([]byte("t2c/hello/v1\n"), nonce...) }
 

@@ -72,7 +72,9 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 	if opt.Workers == 0 {
 		opt.Workers = 6
 	}
-	ws, _, err := websocket.DefaultDialer.DialContext(ctx, url, opt.Header)
+	d := *websocket.DefaultDialer
+	d.Subprotocols = []string{wire.Subprotocol}
+	ws, _, err := d.DialContext(ctx, url, opt.Header)
 	if err != nil {
 		return nil, err
 	}
