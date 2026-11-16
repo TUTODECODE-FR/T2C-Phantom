@@ -1,4 +1,11 @@
+# Vulnérabilités ignorées — chaque entrée doit être justifiée et réexaminée.
+
 [[IgnoredVulns]]
-id = "GO-2024-3218"
-ignoreUntil = "2028-01-01T00:00:00Z"
-reason = "Unfixed upstream vulnerability in go-libp2p-kad-dht. No patch available yet."
+id = "GO-2026-6872"
+ignoreUntil = "2027-06-01T00:00:00Z"
+reason = "labstack/echo v4 : dépendance de Wails v2 utilisée seulement par `wails dev` ; absente du binaire publié (vérifié avec go version -m). Corrigé uniquement en echo v5."
+
+[[IgnoredVulns]]
+id = "GO-2026-6875"
+ignoreUntil = "2027-06-01T00:00:00Z"
+reason = "labstack/echo v4 : dépendance de Wails v2 utilisée seulement par `wails dev` ; absente du binaire publié (vérifié avec go version -m). Corrigé uniquement en echo v5."

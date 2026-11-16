@@ -17,9 +17,9 @@ jobs:
     
     - uses: actions/setup-go@v5
       with:
-        go-version: '1.26'
+        go-version-file: go.mod
         
     - name: Run Google OSV-Scanner Natively
       run: |
         go install github.com/google/osv-scanner/cmd/osv-scanner@v1
-        osv-scanner -r ./
+        osv-scanner --config osv-scanner.toml -r ./
