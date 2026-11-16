@@ -1,27 +1,28 @@
 # Politique de Sécurité (T2C-Phantom)
 
-La transparence et la confiance sont au cœur du réseau T2C Phantom. Bien que ce dépôt soit sous licence stricte de propriété intellectuelle, une partie de son architecture est ouverte à l'audit.
+La transparence et la confiance sont au cœur du réseau T2C Phantom. Ce dépôt publie le client complet pour qu'il puisse être audité.
 
-## 🛡️ Modèle de Menaces (Threat Model)
+## 🛡️ Modèle de menaces
 
-Pour comprendre de quoi T2C Phantom vous protège, voici notre modèle de menace et nos choix de conception assumés :
+Objectif assumé : **protéger l'adresse IP** des utilisateurs et des bénévoles, et **garantir l'authenticité** des sites. T2C Phantom n'est pas un outil d'anonymat complet comme Tor. Détails : [docs/FONCTIONNEMENT.md](docs/FONCTIONNEMENT.md).
 
-### 1. Pare-feux Strict et Censure (DPI)
-- **Le Risque :** Un réseau d'entreprise ou une dictature bloque tout trafic non standard (ex: bloque les VPNs, bloque SSH, bloque le P2P).
-- **Notre Protection :** T2C Phantom encapsule son trafic dans des WebSockets Sécurisés (WSS) sur le port 443. Pour le pare-feu, cela ressemble à une simple navigation web HTTPS vers un site classique. L'évasion est totale.
+| Menace | Protection |
+|---|---|
+| Un bénévole modifie un site (virus, contenu altéré) | Chaque morceau est vérifié contre l'empreinte signée par TUTODECODE ; morceau rejeté, bénévole banni, signalé et contrôlé |
+| Le relais lit ou modifie les échanges entre pairs | Chiffrement de bout en bout Noise IK ; le relais n'a pas la clé de signature et ne peut pas falsifier un site |
+| Le relais ou l'origine récupère ton IP | Ils ne la reçoivent pas : seul Cloudflare la voit. L'origine refuse toute requête portant un en-tête d'IP |
+| Un vieux catalogue est rejoué | Version signée strictement croissante, retour en arrière refusé |
+| Flood ou création massive d'identités | Cloudflare devant le relais, limites par clé, preuve de travail pour créer une identité |
+| Le certificat local est volé | Il est limité aux noms `.t2c` (Name Constraints) : il ne permet d'imiter aucun autre site |
+| Le proxy capte toute la navigation | Le fichier PAC n'envoie que les `*.t2c` ; tout le reste est en connexion directe |
 
-### 2. Le Man-In-The-Middle (L'Administrateur Réseau / L'Hébergeur Cloud)
-- **Le Risque :** L'administrateur de votre réseau force le déchiffrement SSL (Inspection SSL), ou l'hébergeur du Relais tente de lire vos paquets.
-- **Notre Protection :** Le **Chiffrement Emboîté (Double Encryption)**. L'architecture utilise le protocole cryptographique *Noise* de `libp2p`. Même si l'hébergeur cloud supprime la couche HTTPS externe, les paquets internes restent chiffrés de bout en bout. Le Relais Cloud n'est qu'un "tuyau opaque" aveugle.
+**Ce qui reste visible (limites assumées)**
+- **Cloudflare** voit ton IP et les sites `.t2c` demandés.
+- **Le relais** voit ta clé pseudonyme, les sites demandés et avec quelles clés tu échanges, mais jamais ton IP.
+- Si même Cloudflare ne doit pas connaître ton IP, utilise un VPN ou Tor *avant* T2C Phantom (logiciels tiers, sous ta responsabilité).
+- Un poste compromis (logiciel malveillant, keylogger) est hors de portée de toute protection réseau.
 
-### 3. Empoisonnement du Réseau et DHT Sniffing (Sybil Attacks)
-- **Le Risque :** Des pirates tentent de copier notre code pour créer des faux relais afin d'empoisonner le réseau (Attaques Sybil) ou d'enregistrer les requêtes de nos utilisateurs.
-- **Notre Protection (Transparence Hybride) :** Nous avons fait le choix assumé de garder **le code source du Relais et l'architecture du serveur ("Le Sous-marin") strictement confidentiels**. En ne publiant pas les clés d'infrastructure, nous empêchons les acteurs malveillants de cloner facilement notre réseau pour l'espionner.
-
-### 4. Confidentialité des Métadonnées (L'Hébergeur du Relais)
-- **La Réalité Technique :** Notre Relais public est actuellement hébergé chez Microsoft Azure. Comme expliqué au point 2, Microsoft ne peut absolument **rien lire** de vos données. Cependant, techniquement, Microsoft (ou tout autre hébergeur) voit nécessairement l'adresse IP publique de la machine qui se connecte au Relais.
-- **Le Remède Absolu (VPN / Tor) :** Si votre modèle de menace exige que même l'hébergeur du Relais ignore votre adresse IP physique, la seule protection absolue est d'utiliser un VPN ou le réseau Tor *avant* de vous connecter à T2C Phantom.
-- **⚠️ Clause de non-responsabilité :** L'association TUTODECODE garantit l'inviolabilité absolue de son tunnel P2P décentralisé. En revanche, nous ne garantissons ni la fiabilité ni la sécurité des logiciels VPN tiers ou de Tor que vous choisiriez d'utiliser en surcouche.
+Le code du relais et de l'origine n'est pas publié. La sécurité des utilisateurs n'en dépend pas : tout ce qui protège ta vie privée et l'intégrité des sites s'exécute dans le client public de ce dépôt.
 
 ---
 
@@ -48,4 +49,4 @@ Lors de votre signalement, veuillez inclure :
 L'Association TUTODECODE s'engage sur les délais suivants :
 - **Accusé de réception** : dans les 72 heures.
 - **Évaluation et Tri** : dans les 7 jours ouvrables.
-- **Remédiation** : Après un correctif, une nouvelle release est générée, signée cryptographiquement, et les nœuds du réseau sont invités à se mettre à jour.
+- **Remédiation** : Après un correctif, une nouvelle release est générée par GitHub Actions (avec `SHA256SUMS.txt`) et recopiée sur GitLab.

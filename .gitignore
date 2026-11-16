@@ -43,3 +43,8 @@ infra/tailscale/
 desktop/build/*
 !desktop/build/appicon.png
 desktop/frontend/
+
+# Scripts personnels (LaunchAgent local), hors dépôt
+keep_t2c_alive.sh
+start_t2c.sh
+*.log

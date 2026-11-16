@@ -10,6 +10,7 @@ T2C-Phantom/
 │   ├── t2c/          Client : daemon, proxy .t2c, tableau de bord
 │   └── t2c-peer/     Client minimal en ligne de commande (list / fetch / host)
 ├── desktop/          Application de bureau (Wails : macOS, Windows, Linux)
+├── docs/             FONCTIONNEMENT.md (comment ça marche), UTILISATION.md (guide)
 ├── pkg/
 │   ├── trust/        Protocole : catalogue, manifestes, hosts.json, tickets signés ; morceaux 256 Ko ; anti-retour arrière
 │   ├── peerid/       Protocole : identité pseudonyme (clé Ed25519 + PoW, clé Noise signée)
