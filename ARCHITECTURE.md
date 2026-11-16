@@ -27,7 +27,8 @@ T2C-Phantom/
 
 ## Points de contrôle côté client
 
-- **Authenticité** : chaque document est vérifié avec la clé racine intégrée au build (`trust.RootPubKeyHex`).
+- **Authenticité** : chaque document est vérifié avec la clé racine intégrée au build (`trust.RootPubKeyHex`). Catalogue et manifestes exigent la clé racine (hors ligne) ; tickets et `hosts.json` acceptent aussi une clé de service déléguée par la racine (`trust.Delegation`, portée et durée limitées).
+- **Protocole** : sous-protocole WebSocket `t2c.v2` obligatoire (`wire.Subprotocol`) ; requêtes relais → origine signées (`relayauth`).
 - **Intégrité** : `Manifest.VerifyChunk`. Un morceau faux entraîne un ban local et un signalement du bénévole.
 - **Bout en bout** : les échanges entre pairs sont chiffrés en Noise IK ; le relais ne les lit pas.
 - **Proxy** : ne sert et ne certifie en HTTPS que les sites du catalogue signé ; le PAC n'y envoie que les `.t2c`.

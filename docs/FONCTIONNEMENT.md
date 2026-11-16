@@ -39,7 +39,9 @@ flowchart LR
 - Chaque site est découpé en **morceaux de 256 Ko**. Le **manifeste signé** donne l'empreinte SHA-256 de chaque morceau.
 - Ton client connaît la **clé publique de TUTODECODE**, inscrite dans l'application. Il refuse tout document mal signé et tout morceau dont l'empreinte ne correspond pas.
 
-Conséquence : **ni un bénévole, ni le relais, ni Cloudflare ne peut modifier un site** sans que ce soit détecté. Un morceau modifié est rejeté, l'expéditeur est banni localement et signalé.
+La clé racine de TUTODECODE n'est **jamais sur un serveur** : les sites sont signés hors ligne, sur le poste de l'éditeur, puis envoyés au serveur sous forme de paquet qu'il revérifie entièrement. Le serveur ne possède qu'une **clé de service déléguée** (durée limitée), autorisée à signer uniquement les tickets et la liste des bénévoles.
+
+Conséquence : **ni un bénévole, ni le relais, ni Cloudflare, ni même un serveur d'origine piraté ne peut modifier un site** sans que ce soit détecté. Un morceau modifié est rejeté, l'expéditeur est banni localement et signalé.
 
 ## Bénévoles, tickets et score
 
