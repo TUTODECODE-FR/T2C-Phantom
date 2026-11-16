@@ -18,7 +18,7 @@ jobs:
           echo "Checking commits for DCO (Signed-off-by) signature..."
           for commit in $(git rev-list origin/${{ github.base_ref }}..HEAD); do
             if ! git show -s --format=%B $commit | grep -q 'Signed-off-by:'; then
-              echo "❌ Error: Commit $commit is missing the 'Signed-off-by:' line."
+              echo "[erreur] Error: Commit $commit is missing the 'Signed-off-by:' line."
               echo "Please amend your commits with 'git commit --amend -s' and force push."
               exit 1
             fi

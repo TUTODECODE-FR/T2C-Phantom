@@ -144,29 +144,29 @@ func runID(args []string) {
 func runDoctor() {
 	fmt.Println("== Diagnostic T2C Phantom ==")
 	if _, err := trust.RootKey(); err != nil {
-		fmt.Println("❌ clé racine :", err)
+		fmt.Println("[erreur] clé racine :", err)
 	} else {
-		fmt.Println("✅ clé racine intégrée")
+		fmt.Println("[ok] clé racine intégrée")
 	}
 	relay := envOr("T2C_RELAY_URL", node.DefaultRelay)
 	if u, err := url.Parse(relay); err == nil {
 		h := u.Hostname()
 		if _, err := net.LookupHost(h); err != nil {
-			fmt.Println("❌ DNS du relais", h, ":", err)
+			fmt.Println("[erreur] DNS du relais", h, ":", err)
 		} else {
-			fmt.Println("✅ DNS du relais", h)
+			fmt.Println("[ok] DNS du relais", h)
 		}
 	}
 	if l, err := net.Listen("tcp", "127.0.0.1:8080"); err != nil {
-		fmt.Println("⚠️  port 8080 déjà utilisé (proxy déjà lancé ?)")
+		fmt.Println("[attention] port 8080 déjà utilisé (proxy déjà lancé ?)")
 	} else {
 		l.Close()
-		fmt.Println("✅ port 8080 libre")
+		fmt.Println("[ok] port 8080 libre")
 	}
 	if err := os.MkdirAll(dataDir(), 0o700); err != nil {
-		fmt.Println("❌ dossier de données :", err)
+		fmt.Println("[erreur] dossier de données :", err)
 	} else {
-		fmt.Println("✅ dossier de données :", dataDir())
+		fmt.Println("[ok] dossier de données :", dataDir())
 	}
 }
 
@@ -191,16 +191,16 @@ func runSetup(enable bool, args []string) {
 	}
 	rep := sysint.Setup(dir, ca.CertPEMPath(), assohttps.Nick(), fmt.Sprintf("127.0.0.1:%d", *port))
 	for _, l := range rep.CA {
-		fmt.Println("✅ CA :", l)
+		fmt.Println("[ok] CA :", l)
 	}
 	for _, l := range rep.Proxy {
-		fmt.Println("✅ proxy .t2c :", l)
+		fmt.Println("[ok] proxy .t2c :", l)
 	}
 	for _, l := range rep.Manual {
-		fmt.Println("👉", l)
+		fmt.Println("[à faire]", l)
 	}
 	for _, l := range rep.Errors {
-		fmt.Println("❌", l)
+		fmt.Println("[erreur]", l)
 	}
 }
 

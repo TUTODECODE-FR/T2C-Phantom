@@ -42,7 +42,7 @@ func StartProxyServer(n Sites, listenAddr string) error {
 		fmt.Println("CA locale .t2c:", err)
 	} else {
 		s.CA = ca
-		fmt.Println("🔐 CA locale:", ca.CertPEMPath())
+		fmt.Println("CA locale:", ca.CertPEMPath())
 	}
 
 	srv := &http.Server{
@@ -53,7 +53,7 @@ func StartProxyServer(n Sites, listenAddr string) error {
 		WriteTimeout:      10 * time.Minute, // premier téléchargement d'un site
 		IdleTimeout:       60 * time.Second,
 	}
-	fmt.Printf("🚀 Proxy T2C sur http://%s\n", listenAddr)
+	fmt.Printf("Proxy T2C sur http://%s\n", listenAddr)
 	return srv.ListenAndServe()
 }
 

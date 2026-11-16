@@ -30,6 +30,6 @@ func TestRPCAsyncEventPush(t *testing.T) {
 	if duration > 100*time.Millisecond {
 		t.Errorf("CRITICAL: RPC channel is blocking. Event emission took too long: %v", duration)
 	} else {
-		t.Logf("✅ RPC Asynchronous Check: 100 events sent without blocking main thread. Took %v", duration)
+		t.Logf("[ok] RPC Asynchronous Check: 100 events sent without blocking main thread. Took %v", duration)
 	}
 }

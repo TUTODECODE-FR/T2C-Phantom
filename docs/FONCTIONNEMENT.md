@@ -4,11 +4,11 @@
 
 ```mermaid
 flowchart LR
-    B["🌐 Ton navigateur"] -->|"*.t2c (PAC)"| P["💻 T2C Phantom<br>(proxy local 127.0.0.1)"]
-    P -->|"WebSocket TLS"| CF(("☁️ Cloudflare<br>seul à voir ton IP"))
-    CF -->|"sans IP"| R["🔀 Relais<br>aiguilleur de clés"]
-    R -->|"lien privé"| O["🏛️ Origine TUTODECODE<br>signe et héberge"]
-    R <-->|"messages chiffrés Noise"| V["🤝 Bénévoles<br>(autres pairs)"]
+    B["Ton navigateur"] -->|"*.t2c (PAC)"| P["T2C Phantom<br>(proxy local 127.0.0.1)"]
+    P -->|"WebSocket TLS"| CF(("Cloudflare<br>seul à voir ton IP"))
+    CF -->|"sans IP"| R["Relais<br>aiguilleur de clés"]
+    R -->|"lien privé"| O["Origine TUTODECODE<br>signe et héberge"]
+    R <-->|"messages chiffrés Noise"| V["Bénévoles<br>(autres pairs)"]
 ```
 
 1. Tu ouvres `https://tutodecode.t2c`. Le navigateur demande au **fichier PAC** où envoyer cette requête : seuls les noms en `.t2c` partent vers T2C Phantom, tout le reste reste direct.

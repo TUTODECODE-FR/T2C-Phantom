@@ -12,7 +12,7 @@ const WrongCertMessage = "Accès refusé : CA locale « tutodecode » absente ou
 func (s *Server) refuseWrongCert(w http.ResponseWriter) bool {
 	if s.CA == nil || !s.CA.IsTutodecodeCA() {
 		http.Error(w, WrongCertMessage, http.StatusForbidden)
-		fmt.Println("🚫", WrongCertMessage)
+		fmt.Println(WrongCertMessage)
 		return true
 	}
 	return false

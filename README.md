@@ -19,20 +19,20 @@
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🎯 C'est quoi ?
+## Présentation
 
 T2C Phantom te permet d'ouvrir les sites **`.t2c`** de TUTODECODE (par exemple `https://tutodecode.t2c`) dans ton navigateur habituel. Ces sites ne sont pas servis par un seul serveur : ils sont **copiés et redistribués par des bénévoles**, comme toi, pendant que l'application tourne.
 
-- 🕶️ **Pseudonyme** — tu n'es qu'une clé générée au hasard sur ta machine. Pas de compte, pas d'email.
-- 🙈 **Ton IP reste cachée** — seul Cloudflare (le point d'entrée) la voit ; le relais, le serveur et les autres pairs ne voient que ta clé.
-- ✍️ **Sites authentiques** — chaque site est signé par TUTODECODE et vérifié morceau par morceau : personne ne peut en modifier un octet en route.
-- 🤝 **Bénévole en option** — tu peux héberger une copie des sites que tu visites pour aider le réseau ; ta copie est contrôlée régulièrement.
+- **Pseudonyme** — tu n'es qu'une clé générée au hasard sur ta machine. Pas de compte, pas d'email.
+- **Ton IP reste cachée** — seul Cloudflare (le point d'entrée) la voit ; le relais, le serveur et les autres pairs ne voient que ta clé.
+- **Sites authentiques** — chaque site est signé par TUTODECODE et vérifié morceau par morceau : personne ne peut en modifier un octet en route.
+- **Bénévole en option** — tu peux héberger une copie des sites que tu visites pour aider le réseau ; ta copie est contrôlée régulièrement.
 
-➡️ [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
+Voir aussi : [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🚀 Installation
+## Installation
 
 Télécharge la dernière version dans les **[Releases](https://github.com/TUTODECODE-FR/T2C-Phantom/releases)** (aussi publiées sur [GitLab](https://gitlab.com/tutodecode-org/T2C-Phantom/-/releases)) :
 
@@ -45,7 +45,7 @@ Télécharge la dernière version dans les **[Releases](https://github.com/TUTOD
 
 Vérifie le fichier téléchargé avec `SHA256SUMS.txt` (publié avec chaque release).
 
-## ▶️ En 3 étapes
+## Démarrage en 3 étapes
 
 1. **Ouvre T2C Phantom.** La connexion démarre toute seule (création de ton identité : quelques secondes la première fois).
 2. **Clique « Configurer automatiquement »** (une seule fois). Ton système peut demander ton mot de passe : l'application installe un certificat **limité aux sites `.t2c`** et règle le proxy pour que **seuls les `.t2c`** passent par T2C Phantom.
@@ -55,9 +55,8 @@ Tout le reste de ta navigation ne change pas. À la fermeture de l'application, 
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## ⚠️ PROPRIÉTÉ INTELLECTUELLE & LICENCE
+## Licence
 > [!WARNING]
-> **PROPRIÉTÉ INTELLECTUELLE & LICENCE**
 > Ce dépôt public publie le **client** (application, daemon et protocole) en source-available : vous pouvez l'auditer et prouver l'absence de porte dérobée. **Ce n'est PAS open source** (pas GPLv3, pas MIT). Tous droits réservés TUTODECODE.
 > Le **code du relais et du serveur origine** n'est pas publié.
 > Utilisation, modification, distribution ou intégration commerciale par un tiers : **interdites** sans accord écrit de TUTODECODE.
@@ -69,7 +68,7 @@ Tout ce qui tourne sur ta machine est public et vérifiable : c'est là que se j
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🛠️ Compiler depuis les sources
+## Compiler depuis les sources
 
 ```bash
 git clone https://github.com/TUTODECODE-FR/T2C-Phantom.git && cd T2C-Phantom
@@ -83,7 +82,7 @@ Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont con
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## ❓ FAQ
+## FAQ
 
 **Est-ce un VPN ou Tor ?** Non. T2C Phantom ne touche qu'aux sites `.t2c`. Pour le reste de ta navigation, rien ne change.
 
@@ -97,7 +96,7 @@ Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont con
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🗺️ Roadmap
+## Roadmap
 
 - **v2.0** — pairs pseudonymes, bénévoles audités, sites signés, application multi-OS, configuration automatique des navigateurs.
 - **v2.1** — plusieurs relais (fin du point unique d'aiguillage), reprise des téléchargements.
@@ -105,7 +104,7 @@ Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont con
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 💖 Soutenir le Projet (Donation)
+## Soutenir le projet
 
 T2C-Phantom et T2DECODE sont développés de manière indépendante et à but non lucratif. Si vous appréciez notre démarche d'éducation souveraine et sans traçage, vous pouvez soutenir notre association loi 1901 :
 
@@ -133,7 +132,7 @@ T2C-Phantom et T2DECODE sont développés de manière indépendante et à but no
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🏛️ L'Association TUTODECODE (Mentions Légales)
+## Association TUTODECODE — mentions légales
 
 Le projet T2DECODE est développé et soutenu par l'**Association TUTODECODE**, structure relevant de l'Économie Sociale et Solidaire (ESS).  
 Notre mission est de démocratiser la maîtrise des infrastructures informatiques et de la cybersécurité en fournissant des outils souverains et respectueux de la vie privée.

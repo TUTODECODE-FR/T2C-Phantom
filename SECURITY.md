@@ -1,8 +1,8 @@
-# Politique de Sécurité (T2C-Phantom)
+# Politique de sécurité
 
 La transparence et la confiance sont au cœur du réseau T2C Phantom. Ce dépôt publie le client complet pour qu'il puisse être audité.
 
-## 🛡️ Modèle de menaces
+## Modèle de menaces
 
 Objectif assumé : **protéger l'adresse IP** des utilisateurs et des bénévoles, et **garantir l'authenticité** des sites. T2C Phantom n'est pas un outil d'anonymat complet comme Tor. Détails : [docs/FONCTIONNEMENT.md](docs/FONCTIONNEMENT.md).
 
@@ -26,13 +26,13 @@ Le code du relais et de l'origine n'est pas publié. La sécurité des utilisate
 
 ---
 
-## 📦 Nomenclature Logicielle (SBOM)
+## Nomenclature logicielle (SBOM)
 
 La liste complète des dépendances logicielles (Software Bill of Materials) est disponible dans :
 - `go.mod` — dépendances déclarées.
 - `go.sum` — versions exactes résolues et hashes d'intégrité cryptographique.
 
-## 🚨 Divulgation Responsable (Vulnerability Reporting)
+## Divulgation responsable
 
 N'ouvrez **pas** d'issues GitHub publiques pour signaler des vulnérabilités critiques (escalade de privilèges, désanonymisation, ou exécution de code à distance).
 Utilisez l'un de ces canaux privés :
@@ -44,7 +44,7 @@ Lors de votre signalement, veuillez inclure :
 - Les étapes précises (Proof of Concept) pour reproduire la faille.
 - L'impact potentiel sur le chiffrement ou la confidentialité.
 
-## ⏱️ Objectifs de Réponse
+## Objectifs de réponse
 
 L'Association TUTODECODE s'engage sur les délais suivants :
 - **Accusé de réception** : dans les 72 heures.

@@ -173,7 +173,7 @@ func (a *AbuseWatch) RecordSpoof(r *http.Request, domain string) (signaled bool,
 	a.push(abuseEvent{At: now, Kind: "spoof", Client: key, Detail: detail, Strikes: b.spoof})
 
 	if b.spoof >= spoofWarnAt {
-		fmt.Println("⚠️  abuse spoof:", key, b.spoof, domain)
+		fmt.Println("[attention] abuse spoof:", key, b.spoof, domain)
 	}
 	if b.spoof >= spoofSignalAt {
 		signaled = true
@@ -181,7 +181,7 @@ func (a *AbuseWatch) RecordSpoof(r *http.Request, domain string) (signaled bool,
 			b.signaled = true
 			a.push(abuseEvent{At: now, Kind: "signal", Client: key, Detail: "spoof HTTPS répété", Strikes: b.spoof})
 			utils.LogSecurityEvent("PROXY_SPOOF_SIGNAL", detail, key)
-			fmt.Println("🚨 SIGNAL spoof HTTPS:", key, "strikes=", b.spoof, domain)
+			fmt.Println("SIGNAL spoof HTTPS:", key, "strikes=", b.spoof, domain)
 		}
 	}
 	if b.spoof >= spoofThrottleAt {
