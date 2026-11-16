@@ -19,6 +19,8 @@ import (
 	"t2c/pkg/node"
 	"t2c/pkg/peerid"
 	"t2c/pkg/proxy"
+	"t2c/pkg/proxy/assohttps"
+	"t2c/pkg/sysint"
 	"t2c/pkg/trust"
 	"t2c/pkg/utils"
 )
@@ -43,6 +45,8 @@ func main() {
 		runID(os.Args[2:])
 	case "doctor":
 		runDoctor()
+	case "setup", "unsetup":
+		runSetup(os.Args[1] == "setup", os.Args[2:])
 	default:
 		printHelp()
 		os.Exit(1)
@@ -166,6 +170,40 @@ func runDoctor() {
 	}
 }
 
+// runSetup : configuration automatique des navigateurs (CA .t2c + proxy PAC), ou retour arrière.
+func runSetup(enable bool, args []string) {
+	fs := flag.NewFlagSet("setup", flag.ExitOnError)
+	port := fs.Int("proxy", 8080, "port du proxy local .t2c")
+	_ = fs.Parse(args)
+	dir := utils.GetT2CDataDir()
+	if !enable {
+		if err := sysint.Disable(dir); err != nil {
+			fmt.Println("restauration:", err)
+			os.Exit(1)
+		}
+		fmt.Println("Réglages proxy d'origine restaurés.")
+		return
+	}
+	ca, err := assohttps.LoadOrCreate()
+	if err != nil {
+		fmt.Println("CA:", err)
+		os.Exit(1)
+	}
+	rep := sysint.Setup(dir, ca.CertPEMPath(), assohttps.Nick(), fmt.Sprintf("127.0.0.1:%d", *port))
+	for _, l := range rep.CA {
+		fmt.Println("✅ CA :", l)
+	}
+	for _, l := range rep.Proxy {
+		fmt.Println("✅ proxy .t2c :", l)
+	}
+	for _, l := range rep.Manual {
+		fmt.Println("👉", l)
+	}
+	for _, l := range rep.Errors {
+		fmt.Println("❌", l)
+	}
+}
+
 func envOr(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
@@ -181,6 +219,8 @@ Usage :
   t2c dashboard           Tableau de bord web (http://127.0.0.1:9090)
   t2c id                  Affiche (ou crée) ton identité pseudonyme
   t2c doctor              Diagnostic
+  t2c setup               Configure tous les navigateurs (CA .t2c + proxy automatique)
+  t2c unsetup             Remet les réglages proxy d'origine
 
 Options de start :
   -relay <url>            Relais (défaut wss://t2cphantom.eu.org/v1/ws)

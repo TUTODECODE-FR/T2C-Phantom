@@ -54,8 +54,10 @@ func LoadOrCreate() (*CA, error) {
 		if err != nil {
 			return nil, err
 		}
-		// Ancienne CA « TUTODECODE Asso » → régénérer en « tutodecode »
-		if c.cert.Subject.CommonName != caCN {
+		// Ancienne CA (autre nom, ou sans Name Constraints .t2c) → on la remplace.
+		// La clé de l'ancienne est supprimée : même restée « de confiance » dans un
+		// navigateur, elle ne peut plus rien signer.
+		if c.cert.Subject.CommonName != caCN || !constrainedToT2C(c.cert) {
 			_ = os.Remove(certPath)
 			_ = os.Remove(keyPath)
 			_ = os.Remove(filepath.Join(dir, ".trusted-v1"))
@@ -85,8 +87,11 @@ func create(dir, certPath, keyPath string) (*CA, error) {
 		IsCA:                  true,
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
-		// Pas de Name Constraints critiques : Firefox les refuse souvent sur les CA locales.
-		// L'anti-spoof reste côté proxy (catalogue asso + publisher).
+		// Name Constraints : cette CA ne peut signer QUE des noms en .t2c.
+		// Installée dans le système, même sa clé volée ne pourrait pas imiter
+		// un autre site (banque, mail…). Respecté par Chrome, Firefox, Safari, Edge.
+		PermittedDNSDomainsCritical: true,
+		PermittedDNSDomains:         []string{"t2c"},
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {
@@ -244,4 +249,9 @@ func IsLoopback(addr string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+// constrainedToT2C : la CA est limitée aux noms .t2c.
+func constrainedToT2C(cert *x509.Certificate) bool {
+	return cert.PermittedDNSDomainsCritical && len(cert.PermittedDNSDomains) == 1 && cert.PermittedDNSDomains[0] == "t2c"
 }

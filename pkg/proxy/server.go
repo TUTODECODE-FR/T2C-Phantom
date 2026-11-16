@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"t2c/pkg/node"
 	"t2c/pkg/proxy/assohttps"
+	"t2c/pkg/sysint"
 	"t2c/pkg/trust"
 )
 
@@ -31,26 +31,18 @@ var _ Sites = (*node.Node)(nil)
 type Server struct {
 	Node Sites
 	CA   *assohttps.CA
+	Addr string // 127.0.0.1:port — sert aussi le PAC (/proxy.pac)
 }
 
 // StartProxyServer démarre le proxy sur listenAddr (bloquant).
 func StartProxyServer(n Sites, listenAddr string) error {
-	s := &Server{Node: n}
+	s := &Server{Node: n, Addr: listenAddr}
 	ca, err := assohttps.LoadOrCreate()
 	if err != nil {
 		fmt.Println("CA locale .t2c:", err)
 	} else {
 		s.CA = ca
 		fmt.Println("🔐 CA locale:", ca.CertPEMPath())
-		if os.Getenv("T2C_NO_BROWSER_SETUP") != "" {
-			// tests / démo : ne jamais toucher au navigateur ni au Bureau de l'utilisateur
-		} else if home, herr := os.UserHomeDir(); herr == nil {
-			ca.EnsureTrusted()
-			dest := filepath.Join(home, "Desktop", "tutodecode-ca.crt")
-			if err := ca.ExportInstallFile(dest); err == nil {
-				fmt.Println("📄 CA à installer:", dest)
-			}
-		}
 	}
 
 	srv := &http.Server{
@@ -75,6 +67,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		s.handleConnectHTTPS(w, req)
+		return
+	}
+	// fichier PAC : n'envoie que les *.t2c au proxy (configuration automatique)
+	if req.URL.Path == "/proxy.pac" && (req.URL.Host == "" || req.Host == s.Addr) {
+		w.Header().Set("Content-Type", "application/x-ns-proxy-autoconfig")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(sysint.PAC(s.Addr)))
 		return
 	}
 	domain := strings.ToLower(strings.Split(req.Host, ":")[0])

@@ -10,11 +10,12 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,13 +23,19 @@ import (
 	"t2c/pkg/node"
 	"t2c/pkg/proxy"
 	"t2c/pkg/proxy/assohttps"
+	"t2c/pkg/sysint"
 	"t2c/pkg/utils"
 )
 
-const (
-	gatewayHost = "t2cphantom.eu.org"
-	proxyPort   = 8080
-)
+const gatewayHost = "t2cphantom.eu.org"
+
+// proxyPort : proxy .t2c local (T2C_PROXY_PORT pour en changer, défaut 8080).
+var proxyPort = func() int {
+	if p, err := strconv.Atoi(os.Getenv("T2C_PROXY_PORT")); err == nil && p > 0 && p < 65536 {
+		return p
+	}
+	return 8080
+}()
 
 type Dashboard struct {
 	mu        sync.Mutex
@@ -39,12 +46,15 @@ type Dashboard struct {
 
 func NewDashboard() *Dashboard { return &Dashboard{} }
 
-func (d *Dashboard) Start(port int) error {
-	cwd, _ := os.Getwd()
-	dir := filepath.Join(cwd, "web-client")
+// Assets : interface web intégrée au binaire (aucun fichier externe, aucune ressource distante).
+func Assets() fs.FS {
+	sub, _ := fs.Sub(webFS, "web")
+	return sub
+}
 
+// APIHandler : routes /api/* (réutilisées par l'application de bureau).
+func (d *Dashboard) APIHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir(dir)))
 	mux.HandleFunc("/api/status", d.handleStatus)
 	mux.HandleFunc("/api/config", d.handleConfig)
 	mux.HandleFunc("/api/client/start", d.handleStartClient)
@@ -54,9 +64,31 @@ func (d *Dashboard) Start(port int) error {
 	mux.HandleFunc("/api/cert-validate", d.handleCertValidate)
 	mux.HandleFunc("/api/asso-ca.crt", d.handleAssoCAFile)
 	mux.HandleFunc("/api/asso-sites", d.handleAssoSites)
+	mux.HandleFunc("/api/setup", d.handleSetup)
+	return mux
+}
+
+// Shutdown arrête la connexion au relais (fermeture de l'application).
+func (d *Dashboard) Shutdown() {
+	d.mu.Lock()
+	n := d.node
+	d.node = nil
+	d.mu.Unlock()
+	if n != nil {
+		n.Stop()
+	}
+	// le proxy local s'arrête avec l'app : on rend au système ses réglages d'origine
+	_ = sysint.Restore(utils.GetT2CDataDir())
+}
+
+// Start : tableau de bord dans le navigateur (mode sans fenêtre), http://127.0.0.1:port.
+func (d *Dashboard) Start(port int) error {
+	mux := http.NewServeMux()
+	mux.Handle("/api/", d.APIHandler())
+	mux.Handle("/", http.FileServerFS(Assets()))
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	fmt.Printf("\n=== T2C Dashboard ===\nInterface : http://%s\nFichiers : %s\n=====================\n\n", addr, dir)
+	fmt.Printf("\n=== T2C Dashboard ===\nInterface : http://%s\n=====================\n\n", addr)
 
 	// anti DNS-rebinding : seul l'hôte local exact est accepté
 	guard := func(next http.Handler) http.Handler {
@@ -180,6 +212,10 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 				d.mu.Unlock()
 			}
 		}()
+	}
+	// plug-and-play : si l'utilisateur a déjà accepté la configuration, on remet le PAC
+	if sysint.Enabled(utils.GetT2CDataDir()) && os.Getenv("T2C_NO_BROWSER_SETUP") == "" {
+		go sysint.Reapply(utils.GetT2CDataDir(), fmt.Sprintf("127.0.0.1:%d", proxyPort))
 	}
 	writeJSON(w, map[string]any{"success": true, "address": n.ID(), "seeding": d.volunteer, "role": "pair"})
 }
@@ -322,12 +358,48 @@ func (d *Dashboard) handleAssoSites(w http.ResponseWriter, r *http.Request) {
 		sites = append(sites, s["alias"].(string))
 	}
 	fp, _ := localCAFingerprint()
+	var installedIn []string
+	if ca, err := assohttps.LoadOrCreate(); err == nil {
+		installedIn = sysint.Status(ca.CertPEMPath(), assohttps.Nick(), "").CA
+	}
 	writeJSON(w, map[string]any{
 		"sites": sites, "count": len(sites),
 		"caDownload": "/api/asso-ca.crt", "caFilename": "tutodecode-ca.crt", "caNick": assohttps.Nick(),
 		"serverCAFingerprint": fp, "serverCADisplay": fp != "",
-		"note": "Une seule CA locale couvre tous les sites du catalogue signé",
+		"caInstalled":   len(installedIn) > 0,
+		"caInstalledIn": installedIn,
+		"canAutoTrust":  os.Getenv("T2C_NO_BROWSER_SETUP") == "",
+		"setupEnabled":  sysint.Enabled(utils.GetT2CDataDir()),
+		"note":          "Une seule CA locale couvre tous les sites du catalogue signé",
 	})
+}
+
+// handleSetup : configuration automatique (CA + proxy) pour tous les navigateurs.
+// GET = état ; POST = installer ; DELETE = désactiver et restaurer.
+func (d *Dashboard) handleSetup(w http.ResponseWriter, r *http.Request) {
+	ca, err := assohttps.LoadOrCreate()
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	dataDir, addr := utils.GetT2CDataDir(), fmt.Sprintf("127.0.0.1:%d", proxyPort)
+	switch r.Method {
+	case http.MethodGet:
+		st := sysint.Status(ca.CertPEMPath(), assohttps.Nick(), addr)
+		writeJSON(w, map[string]any{"enabled": sysint.Enabled(dataDir), "status": st})
+	case http.MethodPost:
+		if os.Getenv("T2C_NO_BROWSER_SETUP") != "" {
+			writeJSON(w, map[string]any{"ok": false, "error": "configuration désactivée (T2C_NO_BROWSER_SETUP)"})
+			return
+		}
+		rep := sysint.Setup(dataDir, ca.CertPEMPath(), assohttps.Nick(), addr)
+		writeJSON(w, map[string]any{"ok": len(rep.CA) > 0, "report": rep})
+	case http.MethodDelete:
+		err := sysint.Disable(dataDir)
+		writeJSON(w, map[string]any{"ok": err == nil})
+	default:
+		http.Error(w, "méthode non autorisée", http.StatusMethodNotAllowed)
+	}
 }
 
 // handleCertValidate : compare le certificat importé dans le navigateur avec la CA locale,

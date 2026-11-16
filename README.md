@@ -106,16 +106,21 @@ flowchart LR
 
 ## 🚀 Démarrage rapide
 
+**Application (macOS, Windows, Linux)** : télécharge la dernière version dans les [Releases](../../releases), ouvre-la, puis clique **« Configurer automatiquement »**. La CA locale (limitée aux noms `.t2c`) est installée et le proxy réglé pour tous tes navigateurs (Chrome, Edge, Safari, Brave, Firefox, Zen) ; seuls les `.t2c` passent par T2C Phantom. Ouvre ensuite `https://tutodecode.t2c`.
+
+> macOS : l'app n'est pas encore signée par Apple. Au premier lancement, clic droit → **Ouvrir**.
+> Linux : installe `libwebkit2gtk-4.1` et, pour la configuration automatique, `libnss3-tools`.
+
+**En ligne de commande** :
+
 ```bash
-git clone https://github.com/TUTODECODE-FR/T2C-Phantom.git && cd T2C-Phantom
-# la clé publique racine est fournie par TUTODECODE
 go build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=<clé publique>" -o t2c ./cmd/t2c
-./t2c doctor
-./t2c start            # proxy .t2c sur 127.0.0.1:8080, bénévole pour les sites visités
-./t2c dashboard        # interface sur http://127.0.0.1:9090
+./t2c setup            # configure les navigateurs (une fois)
+./t2c start            # client + proxy .t2c (bénévole pour les sites visités)
+./t2c unsetup          # remet les réglages proxy d'origine
 ```
 
-Navigateur : proxy HTTP `127.0.0.1:8080`, puis `http://tutodecode.t2c`. Pour le HTTPS `.t2c`, importer la CA locale `tutodecode-ca.crt` (générée sur ta machine, elle ne signe que les sites du catalogue).
+**Compiler l'application** : `cd desktop && wails build` ([Wails v2](https://wails.io)).
 
 Le code du relais et de l'origine n'est pas publié (voir Licence) ; le client ci-dessus suffit pour rejoindre le réseau.
 

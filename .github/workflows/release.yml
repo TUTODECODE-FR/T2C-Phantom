@@ -1,0 +1,212 @@
+# Release multi-OS : toute la génération tourne sur GitHub Actions (dépôt public,
+# minutes illimitées). GitLab ne lance aucun pipeline : il reçoit le code
+# (mirror-gitlab.yml) et les fichiers générés (job « gitlab » ci-dessous).
+#
+# Déclenchement : pousser un tag vX.Y.Z, ou « Run workflow » avec un tag.
+# Réglages du dépôt GitHub (Settings → Secrets and variables → Actions) :
+#   variable T2C_ROOT_PUBKEY : clé publique racine (sortie de `t2c-serv init`) — obligatoire
+#   secret   GITLAB_TOKEN    : jeton GitLab (scopes api + write_repository) — optionnel
+#   variable GITLAB_PROJECT  : ex. tutodecode-org/T2C-Phantom — optionnel
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag à publier (ex. v2.0.0)"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  WAILS_VERSION: v2.17.1
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clé racine présente
+        env:
+          ROOT: ${{ vars.T2C_ROOT_PUBKEY }}
+        run: |
+          if ! [[ "$ROOT" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::Variable T2C_ROOT_PUBKEY absente ou invalide (64 caractères hex attendus)"
+            exit 1
+          fi
+
+  desktop:
+    needs: check
+    name: App ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin/universal
+            name: macOS-universal
+          - os: windows-latest
+            platform: windows/amd64
+            name: Windows-amd64
+          - os: ubuntu-24.04
+            platform: linux/amd64
+            name: Linux-amd64
+            tags: webkit2_41
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            desktop/go.sum
+
+      - name: Dépendances Linux (GTK / WebKit)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Build
+        working-directory: desktop
+        shell: bash
+        env:
+          ROOT: ${{ vars.T2C_ROOT_PUBKEY }}
+        run: |
+          TAGS="${{ matrix.tags }}"
+          wails build -platform ${{ matrix.platform }} -clean -trimpath -nocolour \
+            ${TAGS:+-tags $TAGS} \
+            -ldflags "-s -w -X main.version=${TAG} -X t2c/pkg/trust.RootPubKeyHex=${ROOT}"
+
+      - name: Paquet macOS
+        if: runner.os == 'macOS'
+        working-directory: desktop/build/bin
+        run: ditto -c -k --keepParent "T2C Phantom.app" "$GITHUB_WORKSPACE/T2C-Phantom-${{ matrix.name }}.zip"
+
+      - name: Paquet Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path desktop/build/bin/T2C-Phantom.exe -DestinationPath "T2C-Phantom-${{ matrix.name }}.zip"
+
+      - name: Paquet Linux
+        if: runner.os == 'Linux'
+        run: tar czf "T2C-Phantom-${{ matrix.name }}.tar.gz" -C desktop/build/bin T2C-Phantom
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.name }}
+          path: T2C-Phantom-${{ matrix.name }}.*
+          if-no-files-found: error
+
+  cli:
+    needs: check
+    name: CLI (t2c, t2c-peer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Tests
+        run: go test -race ./...
+      - name: Build multi-OS
+        env:
+          ROOT: ${{ vars.T2C_ROOT_PUBKEY }}
+        run: |
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            os=${target%/*}; arch=${target#*/}; ext=""; [ "$os" = windows ] && ext=.exe
+            out="t2c-cli-${TAG}-${os}-${arch}"
+            mkdir -p "$out"
+            for cmd in t2c t2c-peer; do
+              CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
+                -ldflags "-s -w -X t2c/pkg/trust.RootPubKeyHex=${ROOT}" -o "$out/$cmd$ext" ./cmd/$cmd
+            done
+            if [ "$os" = windows ]; then zip -qr "dist/$out.zip" "$out"; else tar czf "dist/$out.tar.gz" "$out"; fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [desktop, cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Sommes de contrôle
+        working-directory: out
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" out/* --clobber -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" out/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "T2C Phantom $TAG" --generate-notes
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: out/*
+
+  gitlab:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      GITLAB_PROJECT: ${{ vars.GITLAB_PROJECT }}
+    steps:
+      - name: GitLab configuré ?
+        id: cfg
+        run: |
+          if [ -n "$GITLAB_TOKEN" ] && [ -n "$GITLAB_PROJECT" ]; then echo "on=1" >> "$GITHUB_OUTPUT";
+          else echo "::notice::GITLAB_TOKEN / GITLAB_PROJECT absents : publication GitLab ignorée"; fi
+      - uses: actions/download-artifact@v4
+        if: steps.cfg.outputs.on
+        with:
+          name: release-files
+          path: out
+      - name: Fichiers → registre GitLab + release
+        if: steps.cfg.outputs.on
+        run: |
+          set -euo pipefail
+          api="https://gitlab.com/api/v4/projects/$(jq -rn --arg p "$GITLAB_PROJECT" '$p|@uri')"
+          ver="${TAG#v}"
+          links="[]"
+          for f in out/*; do
+            name=$(basename "$f")
+            url="$api/packages/generic/t2c-phantom/$ver/$name"
+            curl -fsS --retry 3 -H "PRIVATE-TOKEN: $GITLAB_TOKEN" --upload-file "$f" "$url" >/dev/null
+            links=$(jq -c --arg n "$name" --arg u "$url" '. + [{name:$n, url:$u, link_type:"package"}]' <<<"$links")
+            echo "↑ $name"
+          done
+          body=$(jq -n --arg tag "$TAG" --argjson links "$links" \
+            '{tag_name:$tag, ref:"main", name:("T2C Phantom " + $tag),
+              description:"Fichiers générés par GitHub Actions (miroir).", assets:{links:$links}}')
+          code=$(curl -s -o /tmp/r.json -w '%{http_code}' -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            -H "Content-Type: application/json" -X POST "$api/releases" -d "$body")
+          if [ "$code" = 409 ]; then
+            echo "release GitLab déjà existante : liens ajoutés un par un"
+            for row in $(jq -c '.[]' <<<"$links"); do
+              curl -s -o /dev/null -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H "Content-Type: application/json" \
+                -X POST "$api/releases/$TAG/assets/links" -d "$row" || true
+            done
+          elif [ "${code:0:1}" != 2 ]; then
+            cat /tmp/r.json; exit 1
+          fi
+          echo "Release GitLab $TAG publiée"

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "T2C Phantom",
+  "outputfilename": "T2C-Phantom",
+  "frontend:dir": "",
+  "frontend:install": "",
+  "frontend:build": "",
+  "author": {
+    "name": "TUTODECODE",
+    "email": "contact@tutodecode.org"
+  },
+  "info": {
+    "companyName": "TUTODECODE",
+    "productName": "T2C Phantom",
+    "productVersion": "2.0.0",
+    "copyright": "© TUTODECODE — tous droits réservés",
+    "comments": "Réseau de pairs pseudonymes"
+  }
+}

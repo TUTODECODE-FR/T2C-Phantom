@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>T2C Phantom</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,7 +17,7 @@
                     <span class="logo-name">T2C</span>
                     <span class="logo-sub">PHANTOM</span>
                 </div>
-                <span class="badge-airgap">AIR-GAPPED</span>
+                <span class="badge-airgap">PSEUDONYME</span>
             </div>
 
             <div class="nav-section-label">NAVIGATION</div>
@@ -51,7 +48,7 @@
                         <span class="status-text" id="statusText">DÉCONNECTÉ</span>
                     </div>
                 </div>
-                <div class="version-tag">v0.1 · Local</div>
+                <div class="version-tag" id="versionTag">v2 · client</div>
             </div>
         </nav>
 
@@ -65,10 +62,10 @@
                     <div class="page-header-left">
                         <div class="page-eyebrow">
                             <span class="eyebrow-dot"></span>
-                            RÉSEAU P2P CHIFFRÉ
+                            RÉSEAU DE PAIRS PSEUDONYMES
                         </div>
                         <h2 class="page-title">Navigation Privée</h2>
-                        <p class="page-desc">Identité éphémère jetable · routage masqué · anonymat garanti sur le réseau&nbsp;.t2c</p>
+                        <p class="page-desc">Identité = clé aléatoire · seul Cloudflare voit ton IP · sites signés et vérifiés</p>
                     </div>
                 </div>
 
@@ -87,8 +84,8 @@
                                 <span class="toggle-visual"></span>
                             </div>
                             <div class="option-body">
-                                <span class="option-title">Partage d'hébergement</span>
-                                <span class="option-desc">Stocker et redistribuer temporairement les sites visités pour renforcer le réseau</span>
+                                <span class="option-title">Bénévole (héberger une copie)</span>
+                                <span class="option-desc">Garde une copie vérifiée des sites visités et la fournit aux autres pairs, via le relais (ton IP reste cachée)</span>
                             </div>
                             <span class="option-badge contrib">CONTRIBUTION</span>
                         </label>
@@ -101,8 +98,8 @@
                                 <span class="toggle-visual"></span>
                             </div>
                             <div class="option-body">
-                                <span class="option-title">Gateway Cloudflare / publique</span>
-                                <span class="option-desc" id="gatewayDesc">Connexion via t2cphantom.eu.org (Cloudflare) — IP VPS/serv masquées</span>
+                                <span class="option-title">Relais d'entrée</span>
+                                <span class="option-desc" id="gatewayDesc">Connexion via t2cphantom.eu.org (Cloudflare) — le relais ne voit que ta clé</span>
                             </div>
                             <span class="option-badge privacy" id="cfBadge">Cloudflare</span>
                         </label>
@@ -112,22 +109,8 @@
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                                 <input type="text" id="txtRelayAddr" value="wss://t2cphantom.eu.org/v1/ws" placeholder="URL du relais (wss://…)">
                             </div>
-                            <div class="relay-hint">Gateway : <strong id="gatewayLabel">t2cphantom.eu.org</strong></div>
+                            <div class="relay-hint">Relais : <strong id="gatewayLabel">t2cphantom.eu.org</strong></div>
                         </div>
-
-                        <div class="option-divider"></div>
-
-                        <label class="option-row" for="chkIsRelay">
-                            <div class="option-toggle">
-                                <input type="checkbox" id="chkIsRelay" checked>
-                                <span class="toggle-visual"></span>
-                            </div>
-                            <div class="option-body">
-                                <span class="option-title">Seeder / hop (actif au lancement)</span>
-                                <span class="option-desc">Redistribue les sites visités et achemine le trafic — le serv Phantom reste, mais est soulagé</span>
-                            </div>
-                            <span class="option-badge relay">SEEDER</span>
-                        </label>
 
                     </div>
 
@@ -147,44 +130,41 @@
                             <span class="pulse-core"></span>
                         </div>
                         <div>
-                            <div class="info-panel-title">Bouclier Actif · Anonymat Garanti</div>
-                            <div class="info-panel-sub">Votre identité réseau est complètement masquée</div>
+                            <div class="info-panel-title">Connecté · identité pseudonyme</div>
+                            <div class="info-panel-sub">Le relais, l'origine et les autres pairs ne voient que ta clé — jamais ton IP</div>
                         </div>
                     </div>
 
                     <div class="proxy-instruction">
-                        <div class="proxy-label">FIREFOX → PROXY LOCAL → SITES .t2c</div>
+                        <div class="proxy-label">TOUS LES NAVIGATEURS → SITES .t2c</div>
                         <ol class="proxy-steps">
                             <li>
                                 <span class="step-num">1</span>
-                                <span>Firefox → Paramètres → Réseau → Paramètres</span>
+                                <span>Clique <strong>Configurer automatiquement</strong> (une seule fois)</span>
                             </li>
                             <li>
                                 <span class="step-num">2</span>
-                                <span>Configuration manuelle · Proxy HTTP
-                                    <code class="proxy-addr">127.0.0.1</code> port
-                                    <code class="proxy-addr">8080</code>
-                                </span>
+                                <span>Ouvre <code>https://tutodecode.t2c</code> dans Chrome, Edge, Safari, Firefox, Zen… — rien d’autre à régler</span>
                             </li>
                             <li>
                                 <span class="step-num">3</span>
-                                <span>Ouvre un site <code>.t2c</code> (les cours restent en <code>.tdc</code> — pas la même chose).</span>
+                                <span class="muted">Sans configuration automatique : proxy HTTP <code class="proxy-addr">127.0.0.1</code> port <code class="proxy-addr" id="proxyPortLabel">8080</code>. Les cours restent en <code>.tdc</code>.</span>
                             </li>
                         </ol>
                         <div class="proxy-meta">
                             <span class="meta-chip">ID <strong id="clientIdValue">—</strong></span>
-                            <span class="meta-chip">Pairs <strong id="peersCount">0</strong></span>
+                            <span class="meta-chip">Bénévoles <strong id="peersCount">0</strong></span>
                             <span class="meta-chip">Rôle <strong id="seederRole">seeder…</strong></span>
                         </div>
                     </div>
 
                     <div class="ca-block" id="certValidateCard">
-                        <div class="card-label">Certificat tutodecode · source asso</div>
-                        <p class="card-text">Firefox affiche « non sécurisé » tant que tu n’as <strong>pas accepté</strong> la CA — c’est normal. Une fois acceptée, <strong>tous</strong> les <code>.t2c</code> publiés par l’asso sont couverts.</p>
-                        <div class="muted" id="assoSitesLine" style="margin:0 0 14px">Sites asso HTTPS : …</div>
+                        <div class="card-label">Navigateurs · certificat .t2c</div>
+                        <p class="card-text">Une CA locale, limitée aux noms <code>.t2c</code>, permet le HTTPS sur tous les sites du catalogue signé. La configuration automatique l’installe dans tous tes navigateurs et règle le proxy pour les seuls <code>.t2c</code>.</p>
+                        <div class="muted" id="assoSitesLine" style="margin:0 0 14px">Sites du catalogue : …</div>
                         <div class="ca-actions">
-                            <button class="btn btn-primary" onclick="promptAcceptCA()">Accepter / télécharger la CA</button>
-                            <button class="btn btn-ghost" onclick="refreshAssoSites(true)">Nouveaux sites asso</button>
+                            <button class="btn btn-primary" onclick="promptAcceptCA()">Configurer automatiquement</button>
+                            <button class="btn btn-ghost" onclick="refreshAssoSites(true)">Actualiser</button>
                         </div>
                         <div class="muted mono" id="officialCertFP">CA : …</div>
                         <div id="certValidateResult" class="test-result hidden" style="margin:14px 0 0"></div>
@@ -228,7 +208,7 @@
                         <button class="btn btn-primary" onclick="testSiteUrl()">Tester</button>
                     </div>
                     <div id="testResult" class="test-result hidden"></div>
-                    <p class="card-text" style="margin-top:16px">Si le proxy Firefox est actif (<code>127.0.0.1:8080</code>), tu verras le site. Sinon le test indique « proxy inactif ».</p>
+                    <p class="card-text" style="margin-top:16px">Si le proxy Firefox est actif (<code>127.0.0.1:<span class="proxy-port-inline">8080</span></code>), tu verras le site. Sinon le test indique « proxy inactif ».</p>
                 </div>
             </section>
 
@@ -251,13 +231,13 @@
                     <ul class="site-list" id="hostedSitesList"><li class="muted">Chargement…</li></ul>
                     <div class="card-label" style="margin-top:20px">Sites carnet local</div>
                     <ul class="site-list" id="localSitesList"><li class="muted">Chargement…</li></ul>
-                    <div class="card-label" style="margin-top:20px">CA officielle asso (publiée par le serv)</div>
+                    <div class="card-label" style="margin-top:20px">CA locale (.t2c uniquement)</div>
                     <div id="assoCABox" class="asso-ca-box muted">Chargement…</div>
                     <div class="card-label" style="margin-top:20px">Signalements abuse (spoof / tamper / flood)</div>
                     <div id="abuseBox" class="asso-ca-box muted">Chargement…</div>
-                    <div class="card-label" style="margin-top:20px">Catalogue gateway (cache 60s) — HTTPS = publisher asso</div>
+                    <div class="card-label" style="margin-top:20px">Catalogue signé</div>
                     <ul class="site-list" id="remoteSitesList"><li class="muted">Chargement…</li></ul>
-                    <div class="card-label" style="margin-top:20px">Seeders / pairs connectés</div>
+                    <div class="card-label" style="margin-top:20px">Bénévoles rencontrés</div>
                     <ul class="site-list" id="seedersList"><li class="muted">Chargement…</li></ul>
                     <p class="muted" id="netNote" style="margin-top:12px"></p>
                     <button class="btn btn-primary" style="margin-top:12px" onclick="refreshNetwork()">Rafraîchir</button>
@@ -367,29 +347,28 @@
     <!-- Toast notification -->
     <div class="toast" id="toast"></div>
 
-    <!-- Onboarding : demander → télécharger → accepter CA (source asso) -->
+    <!-- Configuration automatique des navigateurs (CA .t2c + proxy PAC) -->
     <div class="modal-overlay hidden" id="onboardModal">
         <div class="modal-card">
             <div class="page-eyebrow"><span class="eyebrow-dot"></span> LANCEMENT T2C PHANTOM</div>
-            <h2 class="modal-title">Accepter le certificat tutodecode ?</h2>
+            <h2 class="modal-title">Configurer tes navigateurs pour les sites .t2c ?</h2>
             <p class="modal-text">
-                Sans cette CA, Firefox affiche <strong>« non sécurisé »</strong> sur les sites <code>.t2c</code> — <strong>c’est normal</strong> : il ne reconnaît pas encore le certificat.
-                Le fichier fourni à chaque lancement vient d’une <strong>source fiable de l’asso</strong> (catalogue origin piné). Une fois accepté, il couvre <strong>tous</strong> les sites .t2c publiés par l’asso.
+                Un clic, et tous tes navigateurs (Chrome, Edge, Safari, Brave, Firefox, Zen…) ouvrent les sites <code>.t2c</code> en HTTPS, sans réglage manuel :
             </p>
             <ol class="modal-steps">
-                <li>Télécharge <code>tutodecode-ca.crt</code></li>
-                <li>Firefox → Réglages → Certificats → Autorités → Importer</li>
-                <li>Coche <strong>Confiance pour identifier les sites web</strong> → OK</li>
+                <li>la <strong>CA locale</strong> est installée — générée sur ta machine, elle ne peut signer <strong>que des noms .t2c</strong> (jamais ta banque ni un autre site) ;</li>
+                <li>le proxy se règle tout seul : <strong>seuls les .t2c</strong> passent par T2C Phantom, le reste de ta navigation ne change pas ;</li>
+                <li>à la fermeture de l’app, tes réglages proxy d’origine sont remis.</li>
             </ol>
             <label class="ca-accept-row" for="chkAcceptCA">
                 <input type="checkbox" id="chkAcceptCA">
-                <span>J’accepte d’installer la CA <strong>tutodecode</strong> fournie par l’asso (source fiable)</span>
+                <span>J’accepte. Le système peut me demander mon mot de passe ou une confirmation.</span>
             </label>
             <div class="modal-actions">
-                <button class="btn btn-primary" id="btnAcceptCA" onclick="acceptAndDownloadCA()" disabled>Télécharger &amp; accepter</button>
+                <button class="btn btn-primary" id="btnAcceptCA" onclick="acceptAndDownloadCA()" disabled>Configurer automatiquement</button>
                 <button class="btn btn-ghost" onclick="finishOnboard(false)">Plus tard</button>
             </div>
-            <p class="muted modal-foot">Pas une CA par site : un seul accept suffit pour tous les .t2c asso.</p>
+            <p class="muted modal-foot">Sans outil d’installation disponible (certains Linux), le fichier <code>tutodecode-ca.crt</code> est proposé à importer à la main.</p>
         </div>
     </div>
 

@@ -38,3 +38,8 @@ pkg/originapi/
 infra/vps/
 infra/serv/
 infra/tailscale/
+
+# App de bureau : fichiers générés par Wails
+desktop/build/*
+!desktop/build/appicon.png
+desktop/frontend/

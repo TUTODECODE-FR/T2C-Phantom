@@ -57,21 +57,36 @@ function wireCAAcceptCheckbox() {
     chk.addEventListener('change', () => { btn.disabled = !chk.checked; });
 }
 
-function maybeShowOnboard() {
+/* État réel de la CA : demandé à l’application (profils Firefox / Zen / Trousseau),
+   pas à la mémoire du navigateur — la fenêtre de l’app n’a pas de souvenir fiable. */
+let caState = { installed: false, installedIn: [], canAutoTrust: false };
+async function fetchCAState() {
+    try {
+        const data = await (await fetch('/api/asso-sites')).json();
+        caState = { installed: !!data.caInstalled, installedIn: data.caInstalledIn || [], canAutoTrust: !!data.canAutoTrust };
+        if (caState.installed) localStorage.setItem(LS_CA_ACCEPTED, '1');
+        return data;
+    } catch { return null; }
+}
+
+async function maybeShowOnboard() {
     const modal = document.getElementById('onboardModal');
     if (!modal) return;
     wireCAAcceptCheckbox();
-    // Tant que la CA n’est pas acceptée, on redemande à chaque lancement
-    if (localStorage.getItem(LS_CA_ACCEPTED) === '1') {
+    await fetchCAState();
+    // CA déjà installée : on ne demande rien
+    if (caState.installed) {
         modal.classList.add('hidden');
         return;
     }
     modal.classList.remove('hidden');
 }
 
-function promptAcceptCA() {
+async function promptAcceptCA() {
     const modal = document.getElementById('onboardModal');
     if (!modal) return;
+    await fetchCAState();
+    if (caState.installed) { modal.classList.add('hidden'); return; }
     const chk = document.getElementById('chkAcceptCA');
     const btn = document.getElementById('btnAcceptCA');
     if (chk) chk.checked = false;
@@ -87,7 +102,7 @@ function finishOnboard(accepted) {
         showToast('CA acceptée — importe tutodecode-ca.crt dans Firefox (Autorités)');
         refreshAssoSites(false);
     } else {
-        showToast('Sans CA acceptée, Firefox affichera « non sécurisé » — c’est normal');
+        showToast('Tu pourras configurer plus tard depuis l’accueil');
     }
 }
 
@@ -103,8 +118,35 @@ function downloadTutodecodeCA() {
 async function acceptAndDownloadCA() {
     const chk = document.getElementById('chkAcceptCA');
     if (!chk || !chk.checked) {
-        showToast('Coche d’abord l’acceptation de la CA asso');
+        showToast('Coche d’abord la case d’accord');
         return;
+    }
+    const out0 = document.getElementById('certValidateResult');
+    if (caState.canAutoTrust) {
+        // configuration automatique : CA (système + Firefox/Zen) et proxy PAC (.t2c uniquement).
+        // Le système peut demander ton mot de passe ou une confirmation.
+        try {
+            showToast('Configuration… le système peut demander une confirmation');
+            const res = await (await fetch('/api/setup', { method: 'POST' })).json();
+            const rep = res.report || {};
+            if (out0) {
+                out0.classList.remove('hidden');
+                out0.innerHTML = (res.ok ? '<span class="ok">✓ Configuré pour tous tes navigateurs</span>' : '<span class="bad">Configuration incomplète</span>')
+                    + (rep.ca && rep.ca.length ? `<br><span class="muted">CA : ${esc(rep.ca.join(' · '))}</span>` : '')
+                    + (rep.proxy && rep.proxy.length ? `<br><span class="muted">Proxy .t2c : ${esc(rep.proxy.join(' · '))}</span>` : '')
+                    + (rep.manual && rep.manual.length ? `<br><span class="muted">À faire : ${esc(rep.manual.join(' · '))}</span>` : '')
+                    + (rep.errors && rep.errors.length ? `<br><span class="bad">${esc(rep.errors.join(' · '))}</span>` : '')
+                    + (res.error ? `<br><span class="bad">${esc(res.error)}</span>` : '')
+                    + '<br><span class="muted">Redémarre le navigateur s’il était ouvert.</span>';
+            }
+            if (res.ok) {
+                localStorage.setItem(LS_CA_ACCEPTED, '1');
+                await fetchCAState();
+                refreshAssoSites(false);
+                finishOnboard(true);
+                return;
+            }
+        } catch { /* repli : téléchargement manuel */ }
     }
     downloadTutodecodeCA();
     localStorage.setItem(LS_CA_ACCEPTED, '1');
@@ -120,10 +162,10 @@ async function acceptAndDownloadCA() {
     const out = document.getElementById('certValidateResult');
     if (out) {
         out.classList.remove('hidden');
-        out.innerHTML = `<span class="ok">✓ CA tutodecode acceptée (source asso)</span><br>
-            <span class="muted">Firefox → Certificats → Autorités → Importer tutodecode-ca.crt → trust websites.<br>
-            « Non sécurisé » disparaît ensuite sur tous les .t2c asso.<br>
-            Le serv refuse tout autre certificat (pas le bon nom / pas tutodecode).</span>`;
+        out.innerHTML = `<span class="ok">Fichier tutodecode-ca.crt téléchargé</span><br>
+            <span class="muted">Importe-le comme autorité de confiance : Firefox → Réglages → Certificats → Autorités → Importer ;
+            Chrome / Edge / Safari → certificats du système. Puis règle le proxy du système sur
+            http://127.0.0.1:${(appConfig && appConfig.proxyPort) || 8080}/proxy.pac</span>`;
     }
     finishOnboard(true);
 }
@@ -144,28 +186,34 @@ async function refreshAssoSites(announceNew) {
 
         if (line) {
             line.textContent = sites.length
-                ? ('Sites asso HTTPS (1 CA pour tous) : ' + sites.join(', '))
-                : 'Aucun site asso HTTPS pour l’instant';
+                ? ('Sites du catalogue : ' + sites.join(', '))
+                : 'Catalogue vide ou relais injoignable';
         }
-        if (fpEl) {
+        caState = { installed: !!data.caInstalled, installedIn: data.caInstalledIn || [], canAutoTrust: !!data.canAutoTrust };
+        const btnCA = document.querySelector('button[onclick="promptAcceptCA()"]');
+        if (btnCA) {
+            btnCA.textContent = caState.installed ? '✓ Navigateurs configurés' : 'Configurer automatiquement';
+            btnCA.disabled = caState.installed;
+        }
+        if (fpEl && caState.installed) {
+            fpEl.textContent = 'CA installée · ' + caState.installedIn.join(' · ');
+        } else if (fpEl) {
             const accepted = localStorage.getItem(LS_CA_ACCEPTED) === '1';
             fpEl.textContent = (accepted ? 'CA acceptée · ' : 'CA pas encore acceptée · ')
                 + (data.serverCAFingerprint
-                    ? ('source asso pin ' + data.serverCAFingerprint.slice(0, 16) + '…')
+                    ? ('empreinte ' + data.serverCAFingerprint.slice(0, 16) + '…')
                     : 'tutodecode CA');
         }
         if (announceNew && added.length) {
             if (out) {
                 out.classList.remove('hidden');
-                out.innerHTML = `<span class="ok">Nouveau site asso : ${esc(added.join(', '))}</span><br>
-                    <span class="muted">Pas besoin d’une nouvelle CA — celle déjà acceptée couvre tous les .t2c asso.
+                out.innerHTML = `<span class="ok">Nouveau site : ${esc(added.join(', '))}</span><br>
+                    <span class="muted">Pas besoin de nouvelle configuration — la CA couvre tous les .t2c.
                     « Non sécurisé » = Firefox n’a pas encore importé tutodecode-ca.crt.</span>`;
             }
             showToast('Nouveau site asso — même CA tutodecode');
             // Si jamais accepté : redemander
-            if (localStorage.getItem(LS_CA_ACCEPTED) !== '1') {
-                promptAcceptCA();
-            }
+            if (!caState.installed) promptAcceptCA();
         }
         return data;
     } catch (e) {
@@ -219,7 +267,7 @@ async function fetchStatus() {
 
         if (data.status === 'running') {
             dot.classList.add('connected');
-            text.textContent = data.seeding ? 'SEEDER ACTIF' : 'CONNECTÉ';
+            text.textContent = !data.connected ? 'CONNEXION…' : (data.seeding ? 'BÉNÉVOLE ACTIF' : 'CONNECTÉ');
             settings && settings.classList.add('hidden');
             if (data.proxyPort > 0) {
                 btnStart && btnStart.classList.add('hidden');
@@ -227,13 +275,16 @@ async function fetchStatus() {
                 info && info.classList.remove('hidden');
             }
             if (idEl && data.address) idEl.textContent = data.address;
+            if (data.proxyPort) {
+                document.querySelectorAll('#proxyPortLabel, .proxy-port-inline').forEach(el => el.textContent = String(data.proxyPort));
+            }
             const peersEl = document.getElementById('peersCount');
             if (peersEl) peersEl.textContent = String(data.peers || 0);
             const roleEl = document.getElementById('seederRole');
             if (roleEl) {
                 roleEl.textContent = [
-                    data.seeding ? 'seeding ON' : 'seeding OFF',
-                    data.hopRelay ? 'hop ON' : 'hop OFF',
+                    data.seeding ? 'bénévole ON' : 'bénévole OFF',
+                    data.connected ? 'relais OK' : 'relais…',
                 ].join(' · ');
             }
         } else {
@@ -256,7 +307,6 @@ async function startClient() {
     const enableSeeding = document.getElementById('chkEnableSeeding').checked;
     const useRelay = document.getElementById('chkUseRelay').checked;
     const relayAddr = useRelay ? document.getElementById('txtRelayAddr').value.trim() : '';
-    const isRelay = document.getElementById('chkIsRelay').checked;
 
     try {
         await fetch('/api/client/start', {
@@ -266,14 +316,9 @@ async function startClient() {
                 disable_seeding: !enableSeeding,
                 use_relay: useRelay,
                 relay_addr: relayAddr,
-                is_relay: isRelay,
             }),
         });
-        showToast('Connexion OK — accepte la CA tutodecode pour HTTPS asso');
-        setTimeout(() => {
-            refreshAssoSites(false);
-            if (localStorage.getItem(LS_CA_ACCEPTED) !== '1') promptAcceptCA();
-        }, 1200);
+        showToast('Connexion lancée');
     } catch {
         showToast('Erreur de démarrage');
     }
@@ -441,11 +486,12 @@ async function autoStartSeeder() {
 }
 
 /* ── Boot ─────────────────────────────────────────────────── */
-maybeShowOnboard();
-loadConfig().then(() => autoStartSeeder()).then(() => setTimeout(() => {
-    refreshAssoSites(localStorage.getItem(LS_CA_ACCEPTED) === '1');
-    if (localStorage.getItem(LS_CA_ACCEPTED) !== '1') promptAcceptCA();
-}, 2000));
+wireCAAcceptCheckbox();
+// une seule demande au lancement, et seulement si la CA n’est installée nulle part
+loadConfig().then(() => autoStartSeeder()).then(() => setTimeout(async () => {
+    await refreshAssoSites(false);
+    if (!caState.installed) promptAcceptCA();
+}, 1500));
 setInterval(fetchStatus, 2500);
 setInterval(() => {
     const net = document.getElementById('network-tab');

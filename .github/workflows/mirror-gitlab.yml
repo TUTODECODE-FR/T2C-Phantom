@@ -1,0 +1,43 @@
+# Miroir du code vers GitLab à chaque push sur main et à chaque tag.
+# GitHub est la source ; GitLab ne lance aucun pipeline.
+# Requiert : secret GITLAB_TOKEN (write_repository) et variable GITLAB_PROJECT.
+name: Miroir GitLab
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-gitlab
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    env:
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      GITLAB_PROJECT: ${{ vars.GITLAB_PROJECT }}
+    steps:
+      - name: GitLab configuré ?
+        id: cfg
+        run: |
+          if [ -n "$GITLAB_TOKEN" ] && [ -n "$GITLAB_PROJECT" ]; then echo "on=1" >> "$GITHUB_OUTPUT";
+          else echo "::notice::GITLAB_TOKEN / GITLAB_PROJECT absents : miroir ignoré"; fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.on
+        with:
+          fetch-depth: 0
+      - name: Push vers GitLab
+        if: steps.cfg.outputs.on
+        run: |
+          git remote add gitlab "https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_PROJECT}.git"
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            git push gitlab "refs/tags/${GITHUB_REF_NAME}"
+          else
+            git push gitlab "HEAD:refs/heads/main"
+          fi
