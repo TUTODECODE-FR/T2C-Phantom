@@ -143,8 +143,27 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  notes:
+    needs: check
+    name: Notes de version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # historique et tags complets : comparaison avec la version précédente
+      - name: Ancien vs nouveau
+        run: |
+          mkdir -p notes
+          bash .github/scripts/release-notes.sh "$TAG" "$GITHUB_REPOSITORY" > notes/notes.md
+          cat notes/notes.md >> "$GITHUB_STEP_SUMMARY"
+          cat notes/notes.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: notes/notes.md
+
   release:
-    needs: [desktop, cli]
+    needs: [desktop, cli, notes]
     if: github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -152,8 +171,13 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: "{app-*,cli}"
           path: out
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: notes
       - name: Sommes de contrôle
         working-directory: out
         run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
@@ -163,9 +187,10 @@ jobs:
         run: |
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" out/* --clobber -R "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file notes/notes.md
           else
             gh release create "$TAG" out/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "T2C Phantom $TAG" --generate-notes
+              --title "T2C Phantom $TAG" --notes-file notes/notes.md
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -189,6 +214,11 @@ jobs:
         with:
           name: release-files
           path: out
+      - uses: actions/download-artifact@v4
+        if: steps.cfg.outputs.on
+        with:
+          name: release-notes
+          path: notes
       - name: Fichiers → registre GitLab + release
         if: steps.cfg.outputs.on
         run: |
@@ -203,13 +233,15 @@ jobs:
             links=$(jq -c --arg n "$name" --arg u "$url" '. + [{name:$n, url:$u, link_type:"package"}]' <<<"$links")
             echo "↑ $name"
           done
-          body=$(jq -n --arg tag "$TAG" --argjson links "$links" \
+          body=$(jq -n --arg tag "$TAG" --argjson links "$links" --rawfile notes notes/notes.md \
             '{tag_name:$tag, ref:"main", name:("T2C Phantom " + $tag),
-              description:"Fichiers générés par GitHub Actions (miroir).", assets:{links:$links}}')
+              description:($notes + "\n\nFichiers générés par GitHub Actions et recopiés ici."), assets:{links:$links}}')
           code=$(curl -s -o /tmp/r.json -w '%{http_code}' -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
             -H "Content-Type: application/json" -X POST "$api/releases" -d "$body")
           if [ "$code" = 409 ]; then
-            echo "release GitLab déjà existante : liens ajoutés un par un"
+            echo "release GitLab déjà existante : notes mises à jour, liens ajoutés un par un"
+            curl -s -o /dev/null -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H "Content-Type: application/json" \
+              -X PUT "$api/releases/$TAG" -d "$(jq -n --rawfile n notes/notes.md '{description:$n}')" || true
             for row in $(jq -c '.[]' <<<"$links"); do
               curl -s -o /dev/null -H "PRIVATE-TOKEN: $GITLAB_TOKEN" -H "Content-Type: application/json" \
                 -X POST "$api/releases/$TAG/assets/links" -d "$row" || true
