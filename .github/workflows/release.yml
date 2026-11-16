@@ -17,6 +17,11 @@ on:
       tag:
         description: "Tag à publier (ex. v2.0.0)"
         required: true
+        default: v0.0.0-essai
+      dry_run:
+        description: "Essai à blanc : compile tout, ne publie rien (clé racine facultative)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,6 +29,7 @@ permissions:
 env:
   WAILS_VERSION: v2.17.1
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  DRY_RUN: ${{ github.event.inputs.dry_run == 'true' }}
 
 jobs:
   check:
@@ -33,6 +39,7 @@ jobs:
         env:
           ROOT: ${{ vars.T2C_ROOT_PUBKEY }}
         run: |
+          if [ "$DRY_RUN" = true ]; then echo "::notice::essai à blanc : aucune publication"; exit 0; fi
           if ! [[ "$ROOT" =~ ^[0-9a-f]{64}$ ]]; then
             echo "::error::Variable T2C_ROOT_PUBKEY absente ou invalide (64 caractères hex attendus)"
             exit 1
@@ -138,6 +145,7 @@ jobs:
 
   release:
     needs: [desktop, cli]
+    if: github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
