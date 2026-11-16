@@ -1,25 +1,26 @@
+// t2c : client T2C Phantom (daemon + proxy .t2c + tableau de bord).
 package main
 
 import (
 	"context"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
-	"strconv"
+	"os/signal"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"t2c/pkg/api"
-	"t2c/pkg/crypto"
 	"t2c/pkg/metrics"
-	"t2c/pkg/p2p"
+	"t2c/pkg/node"
+	"t2c/pkg/peerid"
 	"t2c/pkg/proxy"
-	"t2c/pkg/tui"
+	"t2c/pkg/trust"
 	"t2c/pkg/utils"
-
-	ic "github.com/libp2p/go-libp2p/core/crypto"
 )
 
 func main() {
@@ -27,250 +28,165 @@ func main() {
 		printHelp()
 		os.Exit(1)
 	}
-
-	// Initialisation du Logger de sécurité dans le bon dossier OS-specific
+	_ = os.MkdirAll(utils.GetT2CDataDir(), 0o700)
 	utils.InitSecurityLogger(utils.GetPath("security.log"))
 
-	cmd := os.Args[1]
-
-	switch cmd {
-	case "init":
-		tui.RunInitWizard()
-
-	case "doctor":
-		runDoctorCommand()
-
-	case "genkey":
-		priv, pub, err := crypto.GenerateKeyPair()
-		if err != nil {
-			fmt.Println("Error generating keys:", err)
-			return
-		}
-
-		privBytes, _ := ic.MarshalPrivateKey(priv)
-		privB64 := base64.StdEncoding.EncodeToString(privBytes)
-
-		addr, _ := crypto.GetT2CAddress(pub)
-
-		fmt.Println("=== T2C Identity Generated ===")
-		fmt.Printf("Address (.t2c): %s\n", addr)
-		fmt.Printf("Private Key: %s\n", privB64)
-		fmt.Println("(Save this Private Key to start your daemon later)")
-
-	case "dashboard-client":
-		fmt.Println("Starting Web Dashboard (Client Mode)...")
-		dashboard := api.NewDashboard(false)
-		if err := dashboard.Start(9090); err != nil {
-			fmt.Println("Dashboard error:", err)
-		}
-
+	switch os.Args[1] {
 	case "start":
-		startCmd := flag.NewFlagSet("start", flag.ExitOnError)
-		privKeyB64 := startCmd.String("key", "", "Base64 Private Key")
-		port := startCmd.Int("port", 4001, "P2P Listen Port")
-		proxyPort := startCmd.Int("proxy", 0, "HTTP Proxy Listen Port (e.g., 8080)")
-		bootstrap := startCmd.String("bootstrap", "", "Comma-separated bootstrap peers")
-		carnetPath := startCmd.String("carnet", utils.GetPath("carnet.json"), "Path to the carnet.json file for DNS aliases")
-		relaysStr := startCmd.String("relays", "", "Comma-separated list of Relays (multiaddrs) to mask IP and ensure high availability")
-
-		// Nouveaux drapeaux durcissement Phase 8.1
-		metricsPort := startCmd.Int("metrics-port", 2112, "Prometheus Metrics Port")
-		useI2P := startCmd.Bool("i2p", false, "Force anonymisation via le pont SAM I2P")
-		i2pFallback := startCmd.Bool("i2p-fallback", false, "Basculement automatique sur I2P en cas de coupure WSS")
-		vaultPass := startCmd.String("vault-pass", "", "Mot de passe pour le chiffrement AES-256-GCM du cache")
-		maxMemory := startCmd.Int64("max-memory", 256*1024*1024, "Limite de mémoire vive en octets (LXC)")
-		maxPeers := startCmd.Int("max-peers", 50, "Limite de pairs maximum connectés (LXC)")
-
-		startCmd.Parse(os.Args[2:])
-
-		// Configuration du chiffrement de cache local
-		crypto.VaultPassphrase = *vaultPass
-
-		var privKey ic.PrivKey
-
-		if *privKeyB64 == "" {
-			fmt.Println("⚠️ Aucune clé fournie : Génération d'une identité ÉPHÉMÈRE (Jetée à la fermeture)...")
-			priv, _, err := crypto.GenerateKeyPair()
-			if err != nil {
-				fmt.Println("Failed to generate ephemeral key:", err)
-				return
-			}
-			privKey = priv
-		} else {
-			privBytes, err := base64.StdEncoding.DecodeString(*privKeyB64)
-			if err != nil {
-				fmt.Println("Invalid private key format.")
-				return
-			}
-
-			privKey, err = ic.UnmarshalPrivateKey(privBytes)
-			if err != nil {
-				fmt.Println("Failed to parse private key:", err)
-				return
-			}
+		runStart(os.Args[2:])
+	case "dashboard-client", "dashboard":
+		if err := api.NewDashboard().Start(9090); err != nil {
+			fmt.Println("tableau de bord:", err)
+			os.Exit(1)
 		}
-
-		ctx := context.Background()
-		var relays []string
-		if *relaysStr != "" {
-			relays = strings.Split(*relaysStr, ",")
-		}
-
-		// Lancement du Node avec les limites LXC
-		node, err := p2p.NewNode(ctx, privKey, *port, false, relays, *maxPeers, *maxMemory)
-		if err != nil {
-			fmt.Println("Failed to start relay node:", err)
-			return
-		}
-
-		// 📊 Lancement du SOC (Metrics Prometheus)
-		go metrics.StartMetricsServer(strconv.Itoa(*metricsPort))
-
-		addr, _ := crypto.GetT2CAddress(privKey.GetPublic())
-		utils.LogSecurityEvent("DAEMON_START", "T2C Client Daemon Started for address: "+addr, "self")
-
-		// TUI Setup & Launch
-		stopTUI := make(chan struct{})
-		activeProto := "WSS/WebRTC"
-		if *useI2P {
-			activeProto = "I2P"
-		}
-
-		go tui.DisplayTUIDashboard(stopTUI, func() tui.StatsDashboard {
-			// Simule ou récupère les métriques réelles pour la TUI
-			peersCount := len(node.Host.Network().Peers())
-			return tui.StatsDashboard{
-				ActiveProtocol:   activeProto,
-				ConnectedPeers:   peersCount,
-				DownloadSpeed:    0.0, // Vitesse instantanée (implémentable avec tracking octets)
-				DownloadedBytes:  0,
-				TotalBytesToSync: 0,
-				ProgressPercent:  100, // Démon prêt
-				SecurityAlerts:   0,   // Aucun event anormal par défaut
-			}
-		})
-
-		// Start proxy FIRST so it is immediately available, even before relay is up.
-		if *proxyPort > 0 {
-			proxyAddr := fmt.Sprintf("127.0.0.1:%d", *proxyPort)
-			go func() {
-				if err := proxy.StartProxyServer(node, proxyAddr, *carnetPath); err != nil {
-					fmt.Println("Proxy error:", err)
-				}
-			}()
-		}
-
-		// Bootstrap and relay reservation run in background
-		go func() {
-			var peers []string
-			if *bootstrap != "" {
-				peers = strings.Split(*bootstrap, ",")
-			}
-			bootstrapCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			
-			// Si basculement automatique I2P configuré
-			err := node.Bootstrap(bootstrapCtx, peers)
-			if err != nil && *i2pFallback {
-				fmt.Println("[FAILOVER] Échec de l'amorçage WSS. Tentative de basculement vers I2P...")
-				activeProto = "I2P (Fallback)"
-				// Tentative de connexion via pont SAM v3
-				if _, samErr := p2p.ConnectSAM("127.0.0.1:7656"); samErr == nil {
-					fmt.Println("[FAILOVER] Pont SAM I2P connecté avec succès !")
-				} else {
-					fmt.Printf("[FAILOVER] Impossible de basculer sur I2P : %v\n", samErr)
-					activeProto = "WSS (Dégradé)"
-				}
-			} else if err != nil {
-				fmt.Println("Bootstrap info:", err)
-			}
-
-			// Réservation d'un relais si demandé pour masquer son IP
-			if len(relays) > 0 {
-				for _, r := range relays {
-					relayCtx, cancelRelay := context.WithTimeout(ctx, 20*time.Second)
-					if err := node.ReserveRelay(relayCtx, r); err != nil {
-						fmt.Printf("Failed to reserve relay %s: %v\n", r, err)
-					}
-					cancelRelay()
-				}
-			}
-		}()
-
-		// Keep alive
-		select {}
-
+	case "id":
+		runID(os.Args[2:])
+	case "doctor":
+		runDoctor()
 	default:
 		printHelp()
+		os.Exit(1)
 	}
 }
 
-func runDoctorCommand() {
-	fmt.Println("==================================================")
-	fmt.Println("   Diagnostic Système T2C-Phantom (Doctor)        ")
-	fmt.Println("==================================================")
+func dataDir() string { return utils.GetPath("peer") }
 
-	// 1. Vérification Port de Métriques
-	fmt.Print("[*] Vérification du port de métriques (2112)... ")
-	l, err := net.Listen("tcp", "127.0.0.1:2112")
+func runStart(args []string) {
+	fs := flag.NewFlagSet("start", flag.ExitOnError)
+	relay := fs.String("relay", envOr("T2C_RELAY_URL", node.DefaultRelay), "URL WebSocket du relais (Cloudflare → VPS)")
+	proxyPort := fs.Int("proxy", 8080, "port du proxy local .t2c (0 = désactivé)")
+	host := fs.String("host", "", "sites à héberger dès le démarrage (séparés par des virgules)")
+	noVolunteer := fs.Bool("no-volunteer", false, "ne pas héberger de copie des sites visités")
+	carnetPath := fs.String("carnet", utils.GetPath("carnet.json"), "alias locaux (JSON alias.t2c → site)")
+	metricsPort := fs.Int("metrics-port", 0, "métriques Prometheus sur 127.0.0.1:<port> (0 = off)")
+	mintBits := fs.Int("mint-bits", peerid.DefaultMintBits, "PoW d'identité à la création")
+	_ = fs.Parse(args)
+
+	var hostSites []string
+	if *host != "" {
+		hostSites = strings.Split(*host, ",")
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if _, err := os.Stat(filepath.Join(dataDir(), "identity.json")); os.IsNotExist(err) {
+		fmt.Printf("Création de ton identité (clé aléatoire + PoW %d bits, quelques secondes)…\n", *mintBits)
+	}
+	n, err := node.Start(ctx, node.Config{
+		RelayURL:  *relay,
+		DataDir:   dataDir(),
+		MintBits:  *mintBits,
+		Volunteer: !*noVolunteer,
+		HostSites: hostSites,
+		Carnet:    api.LoadCarnet(*carnetPath),
+	})
 	if err != nil {
-		fmt.Println("❌ BLOCKED")
-		fmt.Printf("    -> Le port 2112 est déjà utilisé par un autre service.\n")
+		fmt.Println("démarrage:", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Identité : %s (clé aléatoire — personne ne voit ton IP à part Cloudflare)\n", n.ID())
+	fmt.Printf("Relais   : %s\n", *relay)
+	utils.LogSecurityEvent("DAEMON_START", "client démarré", n.ID())
+
+	if *proxyPort > 0 {
+		go func() {
+			if err := proxy.StartProxyServer(n, fmt.Sprintf("127.0.0.1:%d", *proxyPort)); err != nil {
+				fmt.Println("proxy:", err)
+			}
+		}()
+	}
+	if *metricsPort > 0 {
+		go metrics.StartMetricsServer(fmt.Sprintf("127.0.0.1:%d", *metricsPort))
+	}
+
+	t := time.NewTicker(30 * time.Second)
+	defer t.Stop()
+	var last node.Status
+	for {
+		select {
+		case <-ctx.Done():
+			n.Stop()
+			return
+		case <-t.C:
+			st := n.Status()
+			metrics.Observe(last, st)
+			if st.Connected != last.Connected || st.LastError != last.LastError {
+				state := "connecté"
+				if !st.Connected {
+					state = "déconnecté: " + st.LastError
+				}
+				fmt.Printf("[%s] %s · bénévole pour %d site(s) · morceaux pairs=%d origine=%d rejetés=%d\n",
+					time.Now().Format("15:04:05"), state, len(st.Hosted), st.FromPeers, st.FromOrigin, st.BadChunks)
+			}
+			last = st
+		}
+	}
+}
+
+func runID(args []string) {
+	fs := flag.NewFlagSet("id", flag.ExitOnError)
+	mintBits := fs.Int("mint-bits", peerid.DefaultMintBits, "PoW d'identité à la création")
+	_ = fs.Parse(args)
+	id, err := peerid.LoadOrCreate(filepath.Join(dataDir(), "identity.json"), *mintBits)
+	if err != nil {
+		fmt.Println("identité:", err)
+		os.Exit(1)
+	}
+	fmt.Println("Identité :", id.ID())
+	fmt.Println("Fichier  :", filepath.Join(dataDir(), "identity.json"), "(0600 — ne le partage pas)")
+	fmt.Println("Supprimer ce fichier = nouvelle identité (nouvelle PoW, score repart de zéro).")
+}
+
+func runDoctor() {
+	fmt.Println("== Diagnostic T2C Phantom ==")
+	if _, err := trust.RootKey(); err != nil {
+		fmt.Println("❌ clé racine :", err)
+	} else {
+		fmt.Println("✅ clé racine intégrée")
+	}
+	relay := envOr("T2C_RELAY_URL", node.DefaultRelay)
+	if u, err := url.Parse(relay); err == nil {
+		h := u.Hostname()
+		if _, err := net.LookupHost(h); err != nil {
+			fmt.Println("❌ DNS du relais", h, ":", err)
+		} else {
+			fmt.Println("✅ DNS du relais", h)
+		}
+	}
+	if l, err := net.Listen("tcp", "127.0.0.1:8080"); err != nil {
+		fmt.Println("⚠️  port 8080 déjà utilisé (proxy déjà lancé ?)")
 	} else {
 		l.Close()
-		fmt.Println("✅ FREE")
+		fmt.Println("✅ port 8080 libre")
 	}
-
-	// 2. Vérification du Pont SAM d'I2P
-	fmt.Print("[*] Recherche du pont SAM I2P (127.0.0.1:7656)... ")
-	if p2p.TestSAMBridge("127.0.0.1:7656") {
-		fmt.Println("✅ RUNNING")
+	if err := os.MkdirAll(dataDir(), 0o700); err != nil {
+		fmt.Println("❌ dossier de données :", err)
 	} else {
-		fmt.Println("⚠️ NOT RUNNING")
-		fmt.Println("    -> Le routeur I2P (i2pd ou java) n'a pas été détecté sur le port SAM.")
+		fmt.Println("✅ dossier de données :", dataDir())
 	}
+}
 
-	// 3. Connexion Internet & DNS
-	fmt.Print("[*] Résolution DNS de l'infrastructure d'amorçage... ")
-	_, dnsErr := net.LookupHost("bootstrap.libp2p.io")
-	if dnsErr == nil {
-		fmt.Println("✅ OK")
-	} else {
-		fmt.Println("❌ FAILED")
-		fmt.Printf("    -> Impossible de joindre les serveurs DNS. Vérifiez votre connectivité réseau.\n")
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
 	}
-
-	// 4. Intégrité des répertoires de cache
-	fmt.Print("[*] Intégrité de l'arborescence locale de cache... ")
-	cachePath := utils.GetPath("swarm_zips")
-	_ = os.MkdirAll(cachePath, 0700)
-	if _, err := os.Stat(cachePath); err == nil {
-		fmt.Println("✅ OK")
-	} else {
-		fmt.Println("❌ ERROR")
-	}
-	fmt.Println("\nDiagnostic terminé.")
+	return def
 }
 
 func printHelp() {
-	fmt.Println("T2C Phantom - Client Network Node")
-	fmt.Println("\nUsage:")
-	fmt.Println("  t2c init             Lancer l'assistant interactif de configuration")
-	fmt.Println("  t2c doctor           Lancer les tests de diagnostic système")
-	fmt.Println("  t2c genkey           Generate a new identity")
-	fmt.Println("  t2c start            Start the daemon via CLI")
-	fmt.Println("  t2c dashboard-client Start the User Interface (Port 9090)")
-	fmt.Println("\nStart Options:")
-	fmt.Println("  --key <base64>       Private key (Optional: if empty, an ephemeral key is generated)")
-	fmt.Println("  --port <int>         P2P Port (default 4001)")
-	fmt.Println("  --proxy <int>        Enable local HTTP proxy on this port")
-	fmt.Println("  --bootstrap <addr>   Comma-separated bootstrap multiaddrs")
-	fmt.Println("  --carnet <path>      Path to carnet.json (DNS aliases)")
-	fmt.Println("  --relays <addr>      Connect to a list of Relays to mask your real IP")
-	fmt.Println("  --metrics-port <int> Prometheus metrics listener port (default 2112)")
-	fmt.Println("  --i2p                Force I2P routing")
-	fmt.Println("  --i2p-fallback       Enable auto fallback to I2P on standard bootstrap loss")
-	fmt.Println("  --vault-pass <str>   Encryption key for local cache at rest")
-	fmt.Println("  --max-memory <bytes> Maximum RAM allowed for P2P resource manager")
-	fmt.Println("  --max-peers <int>    Maximum active peer connections allowed")
+	fmt.Println(`T2C Phantom — client
+
+Usage :
+  t2c start [options]     Lance le client (connexion au relais + proxy .t2c)
+  t2c dashboard           Tableau de bord web (http://127.0.0.1:9090)
+  t2c id                  Affiche (ou crée) ton identité pseudonyme
+  t2c doctor              Diagnostic
+
+Options de start :
+  -relay <url>            Relais (défaut wss://t2cphantom.eu.org/v1/ws)
+  -proxy <port>           Proxy local .t2c (défaut 8080, 0 = off)
+  -host a,b               Héberger ces sites dès le démarrage
+  -no-volunteer           Ne pas héberger les sites visités
+  -carnet <fichier>       Alias locaux
+  -metrics-port <port>    Métriques Prometheus sur 127.0.0.1`)
 }

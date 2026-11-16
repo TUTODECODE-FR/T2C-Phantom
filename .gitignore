@@ -18,3 +18,23 @@ admin_key.txt
 # Dossiers générés
 data/
 export_swarm/
+t2c-mac
+t2c-peer
+
+# Fichiers système / locaux
+.DS_Store
+*.crt
+*.pem
+*.key
+mac_t2c.log
+
+# Code serveur et relais : dépôts privés séparés (ne jamais les committer ici)
+cmd/t2c-serv/
+cmd/t2c-relay/
+cmd/t2c-keygen/
+pkg/broker/
+pkg/originstore/
+pkg/originapi/
+infra/vps/
+infra/serv/
+infra/tailscale/

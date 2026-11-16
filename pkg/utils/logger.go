@@ -22,6 +22,11 @@ func InitSecurityLogger(logPath string) {
 // LogSecurityEvent is a helper wrapper to log standard security anomalies.
 func LogSecurityEvent(eventType, details, peer string) {
 	if SecurityLogger == nil {
+		slog.Default().Warn("Security Anomaly Detected",
+			"type", eventType,
+			"details", details,
+			"peer", peer,
+		)
 		return
 	}
 	SecurityLogger.Warn("Security Anomaly Detected",

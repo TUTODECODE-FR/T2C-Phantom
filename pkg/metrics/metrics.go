@@ -1,3 +1,4 @@
+// Package metrics : compteurs Prometheus du client, exposés en local uniquement.
 package metrics
 
 import (
@@ -6,48 +7,67 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"t2c/pkg/node"
 )
 
 var (
-	// CorruptedBlocks enregistre le nombre de blocs rejetés par la vérification RAM (Zero-Trust)
-	CorruptedBlocks = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "t2c_blocks_corrupted_total",
-			Help: "Nombre total de fragments corrompus interceptés en mémoire.",
-		},
-	)
-
-	// BannedPeers enregistre le nombre de pairs exclus par le tracker
-	BannedPeers = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "t2c_peers_banned_total",
-			Help: "Nombre total de pairs malveillants définitivement bannis du réseau.",
-		},
-	)
-
-	// Failovers enregistre le nombre de basculements vers le proxy HTTP
-	Failovers = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "t2c_failovers_total",
-			Help: "Nombre total de basculements d'urgence vers le LXC Serveur (Failover).",
-		},
-	)
+	// CorruptedBlocks : morceaux reçus d'un bénévole et rejetés (hash ≠ manifeste signé).
+	CorruptedBlocks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "t2c_blocks_corrupted_total",
+		Help: "Morceaux rejetés car non conformes au manifeste signé.",
+	})
+	// PeerChunks : morceaux reçus de bénévoles.
+	PeerChunks = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "t2c_chunks_from_peers_total",
+		Help: "Morceaux reçus de bénévoles (via le relais, chiffrés de bout en bout).",
+	})
+	// Failovers : morceaux récupérés à l'origine faute de bénévole.
+	Failovers = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "t2c_failovers_total",
+		Help: "Morceaux récupérés via l'origine faute de bénévole.",
+	})
+	// Connected : 1 si connecté au relais.
+	Connected = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "t2c_relay_connected",
+		Help: "1 si le client est connecté au relais.",
+	})
+	// HostedSites : sites hébergés en tant que bénévole.
+	HostedSites = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "t2c_hosted_sites",
+		Help: "Nombre de sites hébergés en tant que bénévole.",
+	})
 )
 
 func init() {
-	// Enregistrement des métriques auprès de Prometheus
-	prometheus.MustRegister(CorruptedBlocks)
-	prometheus.MustRegister(BannedPeers)
-	prometheus.MustRegister(Failovers)
+	prometheus.MustRegister(CorruptedBlocks, PeerChunks, Failovers, Connected, HostedSites)
 }
 
-// StartMetricsServer démarre un serveur HTTP minimal dédié au scraping Prometheus/Grafana
-func StartMetricsServer(port string) {
+// Observe met les compteurs à jour à partir de deux états successifs du nœud.
+func Observe(prev, cur node.Status) {
+	if d := cur.BadChunks - prev.BadChunks; d > 0 {
+		CorruptedBlocks.Add(float64(d))
+	}
+	if d := cur.FromPeers - prev.FromPeers; d > 0 {
+		PeerChunks.Add(float64(d))
+	}
+	if d := cur.FromOrigin - prev.FromOrigin; d > 0 {
+		Failovers.Add(float64(d))
+	}
+	if cur.Connected {
+		Connected.Set(1)
+	} else {
+		Connected.Set(0)
+	}
+	HostedSites.Set(float64(len(cur.Hosted)))
+}
+
+// StartMetricsServer : /metrics sur addr (ex. 127.0.0.1:2112 — jamais exposé publiquement).
+func StartMetricsServer(addr string) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-
-	log.Printf("📊 Prometheus SOC Metrics Server listening on http://0.0.0.0:%s/metrics", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("Failed to start metrics server: %v", err)
+	log.Printf("métriques Prometheus sur http://%s/metrics", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Printf("métriques: %v", err)
 	}
 }

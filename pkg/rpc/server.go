@@ -9,7 +9,7 @@ import (
 
 // WsEvent définit la structure des messages envoyés au client Flutter/Dart
 type WsEvent struct {
-	Type string `json:"type"`
+	Type string      `json:"type"`
 	Data interface{} `json:"data"`
 }
 

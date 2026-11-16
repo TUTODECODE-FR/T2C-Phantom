@@ -14,7 +14,7 @@
 
   <p>
     <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=for-the-badge&logo=go&logoColor=white&labelColor=1A1D2E" alt="Go Version"></a>
-    <a href="https://libp2p.io/"><img src="https://img.shields.io/badge/libp2p-Networking-02569B?style=for-the-badge&logo=ipfs&logoColor=white&labelColor=1A1D2E" alt="libp2p"></a>
+    <a href="https://noiseprotocol.org/"><img src="https://img.shields.io/badge/Noise-E2E-02569B?style=for-the-badge&labelColor=1A1D2E" alt="Noise"></a>
     <a href="#"><img src="https://img.shields.io/badge/Architecture-Zero--Trust-red?style=for-the-badge&labelColor=1A1D2E" alt="Architecture"></a>
     <a href="#"><img src="https://img.shields.io/badge/Privacy-By%20Design-3DDC84?style=for-the-badge&labelColor=1A1D2E" alt="Privacy"></a>
     <a href="#"><img src="https://img.shields.io/badge/License-Propriétaire-blue?style=for-the-badge&labelColor=1A1D2E" alt="License"></a>
@@ -28,7 +28,7 @@
   <br>
   <p>
     <b>Le Moteur Réseau Pair-à-Pair de l'Écosystème Éducatif T2DECODE.</b><br>
-    <i>NAT Traversal · Kademlia DHT · Zero-Trust · Air-Gapped Ready</i>
+    <i>Pairs pseudonymes · Bénévoles audités · Chiffré de bout en bout · Contenu signé</i>
   </p>
   <br>
 </div>
@@ -53,149 +53,71 @@ La mécanique côté client est publique pour l'audit. Le relais reste privé po
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🧠 Architecture et Modèle Théorique
+## 🧠 Architecture
 
-T2C Phantom repose sur un modèle d'architecture décentralisée (Swarm/Mesh) garantissant l'accès à la connaissance sans point de défaillance unique. L'application cliente (T2DECODE) s'appuie sur ce daemon réseau pour interroger l'essaim et synchroniser les cours de manière chiffrée.
-
-### Schéma Conceptuel
+Les utilisateurs sont des **pairs pseudonymes** : chacun n'est qu'une clé générée au hasard sur sa machine. **Seul Cloudflare voit leur IP** ; le relais (VPS), le serveur origine et les autres pairs ne voient que des clés. Les sites sont **hébergés par des bénévoles** et transitent entre pairs **chiffrés de bout en bout** ; chaque morceau est vérifié contre un manifeste **signé par l'origine**, donc personne ne peut modifier un site en route.
 
 ```mermaid
-flowchart TD
+flowchart LR
     classDef client fill:#F5EBDA,stroke:#1A1D2E,stroke-width:2px,color:#1A1D2E;
-    classDef daemon fill:#1A1D2E,stroke:#3DDC84,stroke-width:2px,color:#F5EBDA;
     classDef relay fill:#D93025,stroke:#1A1D2E,stroke-width:2px,color:#F5EBDA;
-    classDef peer fill:#0078D6,stroke:#1A1D2E,stroke-width:2px,color:#F5EBDA;
-    classDef dht fill:#FCC624,stroke:#1A1D2E,stroke-width:2px,color:#1A1D2E;
+    classDef origin fill:#1A1D2E,stroke:#3DDC84,stroke-width:2px,color:#F5EBDA;
+    classDef cf fill:#FCC624,stroke:#1A1D2E,stroke-width:2px,color:#1A1D2E;
 
-    C["💻 Client T2DECODE"]:::client -->|Requêtes Locales| D["⚙️ T2C Phantom Daemon"]:::daemon
-    D -->|Tunnel WSS 443| R(("🌐 Relais Public\n(Routeur Aveugle)")):::relay
-    R -->|Routage| P1["🖥️ Pair A"]:::peer
-    R -->|Routage| P2["🖥️ Pair B"]:::peer
-    P1 -.->|Sync| DHT{"🗂️ Kademlia DHT\n(Annuaire)"}:::dht
-    P2 -.->|Sync| DHT
+    A["💻 Pair A (bénévole)"]:::client -->|WSS| CF(("☁️ Cloudflare\n(seul à voir les IP)")):::cf
+    B["💻 Pair B"]:::client -->|WSS| CF
+    CF -->|sans IP| R["🔀 Relais\n(aiguilleur de clés)"]:::relay
+    R -->|lien privé| O["🏛️ Serveur origine\n(signe et héberge)"]:::origin
+    B -. "morceaux chiffrés Noise via le relais" .-> A
 ```
 
-### Principes Clés
-- **Résilience en Milieux Restreints** : Le trafic est encapsulé dans WSS (HTTPS/TLS sur le port 443), ce qui améliore la résilience face à certains systèmes de filtrage DPI (Deep Packet Inspection) en simulant une navigation web standard.
-- **Chiffrement Emboîté (Zero-Trust)** : Le réseau applique un chiffrement de bout-en-bout (Protocole Noise / AES-GCM). Même si le trafic transite par des relais publics, ceux-ci n'ont accès ni à la clé ni aux données.
-- **Annuaire Décentralisé (Kademlia DHT)** : Il n'y a aucun serveur d'adressage. La résolution de noms (ex: `tutodecode.t2c` -> Peer ID) s'effectue via un résolveur DNS local basé sur le fichier `carnet.json`.
+| Rôle | Ce qu'il fait | Ce qu'il voit |
+|------|---------------|---------------|
+| **Pair** (`t2c`) | Télécharge chez plusieurs bénévoles en parallèle, vérifie chaque morceau, héberge une copie s'il est bénévole | Les clés des bénévoles, jamais leur IP |
+| **Relais** (privé) | Aiguille des messages chiffrés entre clés, sert le catalogue signé, audite les bénévoles, repli sur l'origine | Des clés pseudonymes, jamais d'IP |
+| **Origine** (privée) | Héberge et signe les sites, délivre les tickets de bénévolat, tient le score | Rien des utilisateurs (refuse toute requête portant un header d'IP) |
 
-<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
-
-### 🔒 Primitives Cryptographiques
+### 🔒 Primitives
 
 | Élément | Technologie | Rôle |
-|----------|-------------|------|
-| **Transport** | TLS 1.3 (WSS) | Encapsulation et contournement DPI |
-| **Session** | Protocole Noise | Négociation des clés (Handshake) |
-| **Chiffrement** | AES-256-GCM | Confidentialité des paquets (AEAD) |
-| **Identité** | Ed25519 | Signatures et authentification des nœuds |
-| **Découverte**| Kademlia DHT | Annuaire réseau décentralisé |
+|---------|-------------|------|
+| Identité | Ed25519 + preuve de travail | Clé aléatoire ; recréer une identité après un ban coûte du calcul |
+| Authenticité | Ed25519 (clé de l'origine) | Catalogue, manifestes, liste des bénévoles et tickets signés |
+| Intégrité | SHA-256 par morceau de 256 Ko | Toute modification par un bénévole est détectée |
+| Bout en bout | Noise IK (X25519 / ChaCha20-Poly1305 / BLAKE2s) | Le relais ne lit pas les échanges entre pairs |
+| Transport | WebSocket TLS via Cloudflare | Port 443 standard |
+| Confiance des bénévoles | Audits de stockage + score signé | Copie non conforme → ticket révoqué → ban |
+
+## 🛡️ Modèle de menace
+
+| Menace | Protection |
+|--------|-----------|
+| Bénévole qui modifie un site (virus, contenu) | ✅ Morceau rejeté (hash ≠ manifeste signé), bénévole banni localement, signalé, audité, banni par l'origine |
+| Relais compromis | ✅ Ne peut ni lire les échanges entre pairs ni falsifier un site (pas la clé de signature) ; ⚠️ peut voir qui échange avec qui (sous forme de clés) et refuser le service |
+| Relais / origine qui voudraient l'IP d'un utilisateur | ✅ Ils ne la reçoivent pas ; l'origine refuse même toute requête qui en porterait une |
+| Vieux catalogue rejoué | ✅ Version signée croissante, retour en arrière refusé |
+| Flood / DDoS | ✅ Cloudflare devant ; limites par clé au relais ; PoW d'identité ; le relais n'accepte que Cloudflare |
+| Cloudflare | ⚠️ Voit l'IP et les requêtes envoyées au relais (pas le contenu échangé entre pairs) |
+| Poste client compromis | ❌ Hors périmètre |
+
+**Limite assumée** : les pairs ne se connectent jamais directement (sinon ils verraient leurs IP). Tout le trafic passe par le relais, chiffré : les données viennent des bénévoles, mais l'aiguillage est central et la bande passante du VPS est la limite.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## 🛡️ Modèle de Menace (Ce que nous couvrons)
+## 🚀 Démarrage rapide
 
-La transparence est la fondation de la confiance. Voici une évaluation réaliste des protections offertes par T2C Phantom :
-
-| Menace | Protection | Explication |
-|--------|------------|-------------|
-| **Espionnage du trafic local** | ✅ Oui | Chiffrement WSS + Protocole Noise de bout-en-bout. |
-| **Relais malveillant** | ✅ Oui | Le relais agit comme un routeur aveugle. Il ne détient pas les clés de déchiffrement. |
-| **Blocage institutionnel standard** | ⚠️ Partiel | Le port 443 limite le filtrage de base, mais une inspection SSL avancée avec certificats Root injectés bloquera la connexion. |
-| **Attaque étatique ciblée** | ❌ Non | Le protocole n'est pas conçu pour résister à des acteurs étatiques dédiés (NSA, etc.). Ce n'est pas un outil de dissidence. |
-| **Compromission du poste client** | ❌ Non | Si l'OS de l'utilisateur est infecté (malware, keylogger), le chiffrement réseau devient inutile. |
-
-### 🛑 Limites Connues
-
-Pour une sécurité optimale, il est crucial de comprendre ce que T2C Phantom **ne fait pas** :
-
-- **Ne protège pas contre un poste compromis** : Si votre système d'exploitation est infecté, le chiffrement du réseau devient inefficace.
-- **Ne remplace pas Tor** : Ce n'est pas un outil d'anonymat absolu. L'adresse IP de votre machine est techniquement visible par le relais auquel vous vous connectez.
-- **Ne garantit pas l'anonymat total** : Le but est la confidentialité des données (chiffrement) et le contournement de la censure locale, pas le masquage de l'émetteur.
-- **Ne peut résister à une surveillance globale (Global Passive Adversary)** : Les protocoles Onion et P2P offrent un haut degré de confidentialité mais ne sont pas infaillibles face à une surveillance à l'échelle d'un pays.
-
-### 🛡️ Protections Actives & Mitigations
-T2C-Phantom a été audité et durci pour résister aux attaques opportunistes et étendre ses capacités de survie :
-
-- **Modèle Zero-Trust (Vérification en RAM)** : L'empreinte cryptographique de chaque segment téléchargé est vérifiée en mémoire vive (SHA-256) avant écriture sur disque, annihilant les attaques de type TOCTOU.
-- **Evasion DPI (Obfuscation WebRTC)** : Le transport réseau exploite des tunnels UDP (WebRTC-Direct) déguisant le trafic P2P en flux de visioconférence (type Google Meet) pour traverser les pare-feux institutionnels stricts.
-- **Système Immunitaire P2P (Consensus)** : Un annuaire central (Tracker) gère l'exclusion des nœuds malveillants. Pour empêcher le *Review Bombing*, le système exige le signalement concordant de plusieurs adresses IP distinctes avant tout bannissement.
-- **Moteur de Survie (Failover Automatique)** : En cas de réception de blocs falsifiés ou d'indisponibilité du swarm, le système bascule de façon transparente vers l'infrastructure HTTP de secours pour garantir la complétion du téléchargement sans interrompre l'expérience utilisateur.
-- **Authentification Ed25519 & Anti-Rejeu** : Les communications critiques avec l'API exigent une signature asymétrique Ed25519, un horodatage (Timestamp) et un cache de Nonces pour rendre toute tentative d'attaque par rejeu inopérante.
-- **Hardening DMZ & Rate Limiting** : L'architecture LXC est barricadée derrière un pare-feu applicatif (Nginx) appliquant un Rate Limiting impitoyable et des règles de filtrage interdisant tout mouvement latéral vers le cœur logique.
-- **Observabilité SOC (Prometheus)** : T2C-Phantom exporte nativement ses propres métriques de sécurité (attaques déjouées, pairs bannis, basculements) pour alimenter en temps réel des tableaux de bord de supervision (Grafana).
-- **Anti-DDoS et Sybil (Resource Manager)** : Limitation dynamique de la consommation mémoire et des descripteurs de fichiers pour protéger la topologie Kademlia.
-- **Isolation d'Archives (Sandboxing)** : Extraction sécurisée bloquant les attaques **Zip Bomb**, **ZipSlip** et la compromission via liens symboliques.
-
-<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
-
-## 📊 Métriques Techniques (Estimations)
-
-T2C Phantom a été conçu pour l'efficacité et la légèreté, afin de tourner en tâche de fond sans perturber le poste utilisateur.
-
-> **Benchmark reproductible :**
-> `go test -bench . -benchmem`
-> *Tests réalisés sur : Ubuntu 24.04 / Ryzen 5 5600G / 16 Go RAM / Go 1.26*
-
-- **Empreinte mémoire (RAM)** : ~25 Mo en fonctionnement normal.
-- **Temps de démarrage (Bootstrapping)** : ~3 secondes.
-- **Support des pairs (Swarm)** : Jusqu'à 150 connexions simultanées par nœud sans dégradation de performance.
-- **Taille du binaire (Go)** : ~15 Mo (Standalone, aucune dépendance).
-
-<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
-
-## 🚀 Guide Rapide : Installation et Utilisation
-
-Le projet est conçu pour être compilé depuis les sources ou installé via des scripts automatisés. Assurez-vous d'avoir **Go 1.26+** installé.
-
-### 1. Cloner et Compiler
 ```bash
-git clone https://github.com/TUTODECODE-FR/T2C-Phantom.git
-cd T2C-Phantom
-go build -v -o t2c ./cmd/t2c
-```
-
-### 2. Initialisation & Diagnostic (Recommandé)
-Avant de lancer le démon, initialisez votre configuration et vérifiez l'état de votre système :
-```bash
-# Lancer l'assistant interactif de configuration
-./t2c init
-
-# Lancer le diagnostic système (Ports, I2P SAM, DNS)
+git clone https://github.com/TUTODECODE-FR/T2C-Phantom.git && cd T2C-Phantom
+# la clé publique racine est fournie par TUTODECODE
+go build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=<clé publique>" -o t2c ./cmd/t2c
 ./t2c doctor
+./t2c start            # proxy .t2c sur 127.0.0.1:8080, bénévole pour les sites visités
+./t2c dashboard        # interface sur http://127.0.0.1:9090
 ```
 
-### 3. Installation en tant que Service Système (Arrière-plan permanent)
-Pour exécuter T2C-Phantom comme un service persistant qui redémarre automatiquement en cas de crash :
+Navigateur : proxy HTTP `127.0.0.1:8080`, puis `http://tutodecode.t2c`. Pour le HTTPS `.t2c`, importer la CA locale `tutodecode-ca.crt` (générée sur ta machine, elle ne signe que les sites du catalogue).
 
-*   **Sur Linux & macOS (Unix)** :
-    ```bash
-    sudo chmod +x install.sh
-    sudo ./install.sh
-    ```
-    *Le script installera automatiquement un service Systemd sur Linux ou un agent Launchd sur macOS.*
-
-*   **Sur Windows** (Exécuter dans une console PowerShell en Administrateur) :
-    ```powershell
-    Set-ExecutionPolicy Bypass -Scope Process
-    .\install.ps1
-    ```
-    *Le script installera le démon en tâche d'arrière-plan persistante.*
-
-### 4. Lancement Manuel (CLI)
-Si vous préférez lancer manuellement le démon avec la console interactive TUI :
-```bash
-./t2c start --proxy 8080 --metrics-port 2112 --vault-pass "MaClefChiffrement"
-```
-
-### 5. Déploiement SOC "One-Click" (Supervision Prometheus / Grafana)
-Pour monitorer l'état de sécurité de vos conteneurs LXC et relais en direct :
-```bash
-cd deploy/soc
-docker compose up -d
-```
-*Le tableau de bord Grafana de sécurité est accessible sur http://localhost:3000 (identifiants: admin / admin).*
+Le code du relais et de l'origine n'est pas publié (voir Licence) ; le client ci-dessus suffit pour rejoindre le réseau.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -205,13 +127,13 @@ docker compose up -d
 Pour protéger la topologie réseau de TUTODECODE contre les attaques Sybil (création massive de faux nœuds). La sécurité de l'utilisateur final est assurée par le code client (qui est auditable) et le chiffrement de bout-en-bout.
 
 **2. Le réseau fonctionne-t-il sans Internet ?**  
-Oui. T2C Phantom implémente mDNS et la diffusion UDP (LAN Discovery). Si plusieurs machines sont sur le même réseau local (sans routeur Internet), elles se découvriront et se synchroniseront automatiquement.
+Les sites déjà téléchargés restent consultables hors ligne (cache local). Pour récupérer un nouveau site, il faut joindre le relais.
 
 **3. Les données des cours sont-elles stockées localement ?**  
 Absolument. T2DECODE est une application "Offline-First". T2C Phantom est uniquement utilisé pour la mise à jour asynchrone des paquets éducatifs.
 
-**4. Puis-je héberger mon propre relais ?**  
-Actuellement, le réseau s'appuie sur des relais de confiance pour éviter la pollution de la table DHT. L'hébergement communautaire non vérifié n'est pas encore supporté.
+**4. Comment devenir bénévole ?**  
+`t2c start` héberge par défaut une copie des sites visités (`-no-volunteer` pour refuser). Le relais vérifie régulièrement que ta copie est intacte ; ton score monte à chaque audit réussi.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -220,17 +142,14 @@ Actuellement, le réseau s'appuie sur des relais de confiance pour éviter la po
 Le protocole évolue pour offrir une résilience encore plus forte face à la censure.
 
 ```text
-v1.2 (En cours)
-- Support Multi-relay (Failover automatique si le relais principal est inaccessible).
-- Mode Stealth (Obfuscation avancée des paquets Noise).
+v2.0 (fait)
+- Pairs pseudonymes (clé aléatoire + PoW), seul Cloudflare voit les IP.
+- Bénévoles, tickets signés, audits de stockage, score et ban signés par l'origine.
+- Échanges entre pairs chiffrés de bout en bout via le relais.
 
-v1.3
-- Fédération de relais.
-- Mécanisme de réputation des pairs (Anti-Spam DHT).
-
-v1.4
-- Community relay (Outil CLI simplifié pour héberger son propre relais certifié).
-- Bridging avec le réseau local (Mesh hybride LAN/WAN).
+v2.1
+- Plusieurs relais (fédération) pour supprimer le point unique d'aiguillage.
+- Téléchargement reprenable et cache disque des morceaux.
 ```
 
 ## 💖 Soutenir le Projet (Donation)
