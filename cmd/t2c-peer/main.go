@@ -29,10 +29,14 @@ func die(f string, a ...any) {
 }
 
 func main() {
-	relay := flag.String("relay", "wss://t2cphantom.eu.org/v1/ws", "URL WebSocket du relais")
+	relay := flag.String("relay", "", "URL WebSocket du relais (défaut : relais par défaut du réseau, essayés dans l'ordre)")
 	data := flag.String("data", defaultDataDir(), "dossier de données (identité, copies hébergées)")
 	bits := flag.Int("mint-bits", peerid.DefaultMintBits, "PoW d'identité (à la création)")
 	flag.Parse()
+	relays = node.DefaultRelays
+	if *relay != "" {
+		relays = []string{*relay}
+	}
 	if flag.NArg() < 1 {
 		die("usage: t2c-peer [options] <list|fetch|host> ...")
 	}
@@ -106,7 +110,7 @@ func main() {
 		opt.Store = store
 		var tickets []trust.Ticket
 		for ctx.Err() == nil {
-			c, err := peerclient.Dial(ctx, *relay, id, opt)
+			c, err := dialAny(ctx, id, opt)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "connexion: %v — nouvel essai dans 10 s\n", err)
 				sleep(ctx, 10*time.Second)
@@ -133,14 +137,30 @@ func main() {
 	}
 }
 
-func dial(ctx context.Context, url string, id *peerid.Identity, opt peerclient.Options) *peerclient.Client {
-	dctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	c, err := peerclient.Dial(dctx, url, id, opt)
+// relays : relais à essayer dans l'ordre (celui de -relay s'il est donné,
+// sinon les relais par défaut, comme l'application).
+var relays []string
+
+func dial(ctx context.Context, _ string, id *peerid.Identity, opt peerclient.Options) *peerclient.Client {
+	c, err := dialAny(ctx, id, opt)
 	if err != nil {
 		die("connexion au relais: %v", err)
 	}
 	return c
+}
+
+func dialAny(ctx context.Context, id *peerid.Identity, opt peerclient.Options) (*peerclient.Client, error) {
+	var last error
+	for _, u := range relays {
+		dctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		c, err := peerclient.Dial(dctx, u, id, opt)
+		cancel()
+		if err == nil {
+			return c, nil
+		}
+		last = fmt.Errorf("%s: %w", u, err)
+	}
+	return nil, last
 }
 
 func sleep(ctx context.Context, d time.Duration) {
