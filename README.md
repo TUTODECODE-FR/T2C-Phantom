@@ -29,7 +29,7 @@ T2C Phantom te permet d'ouvrir les sites **`.t2c`** de TUTODECODE (par exemple `
 - **Mode anonyme** — dès que le réseau compte plusieurs relais, tes demandes traversent un circuit chiffré en couches : aucun relais ne relie ton IP à ce que tu consultes. Cellules de taille fixe, trafic leurre et délais aléatoires brouillent aussi l'analyse du trafic.
 - **Bénévole en option** — tu choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque et contrôlées régulièrement.
 
-Voir aussi : [Guide complet](docs/GUIDE.md) · [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
+Voir aussi : [Guide complet](docs/GUIDE.md) · [Glossaire](docs/GUIDE.md#16-glossaire) · [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -41,10 +41,22 @@ Télécharge la dernière version dans les **[Releases](https://github.com/TUTOD
 |---|---|---|
 | macOS (Intel et Apple Silicon) | `T2C-Phantom-macOS-universal.zip` | 1er lancement : clic droit → **Ouvrir** (app pas encore signée par Apple) |
 | Windows 10 / 11 | `T2C-Phantom-Windows-amd64.zip` | « Informations complémentaires » → **Exécuter quand même** si SmartScreen s'affiche |
-| Linux | `T2C-Phantom-Linux-amd64.tar.gz` | nécessite `libwebkit2gtk-4.1` ; `libnss3-tools` pour la configuration automatique |
-| Ligne de commande | `t2c-cli-…` | serveurs, scripts, sans interface |
+| Linux | `T2C-Phantom-Linux-amd64.tar.gz` | nécessite `libwebkit2gtk-4.1-0` ; `libnss3-tools` pour la configuration automatique |
+| Ligne de commande | `t2c-cli-<version>-<système>-<architecture>` (`darwin-arm64`, `darwin-amd64`, `linux-amd64`, `linux-arm64`, `windows-amd64`) | serveurs, scripts, sans interface ([mode d'emploi](docs/GUIDE.md#10-ligne-de-commande)) |
 
-Vérifie le fichier téléchargé avec `SHA256SUMS.txt` (publié avec chaque release).
+Vérifie le fichier téléchargé avec `SHA256SUMS.txt`, publié avec chaque release, dans le dossier où se trouvent les deux fichiers :
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing     # macOS
+sha256sum -c SHA256SUMS.txt --ignore-missing         # Linux
+```
+
+```powershell
+# Windows (PowerShell) : affiche la ligne correspondante si le fichier est intact
+Select-String -Path SHA256SUMS.txt -Pattern (Get-FileHash T2C-Phantom-Windows-amd64.zip -Algorithm SHA256).Hash.ToLower()
+```
+
+Le fichier doit être marqué `OK` (ou, sous Windows, la ligne doit s'afficher). Sinon, **ne l'ouvre pas** : retélécharge-le, un téléchargement interrompu suffit à fausser la somme.
 
 ## Démarrage
 
@@ -92,7 +104,7 @@ Tout ce qui tourne sur ta machine est public et vérifiable : c'est là que se j
 
 ## Démarrage rapide (développeurs)
 
-Prérequis : Go (version indiquée dans `go.mod`) ; pour l'application, [Wails v2](https://wails.io) et, sous Linux, `libgtk-3-dev libwebkit2gtk-4.1-dev`.
+Prérequis : [Go](https://go.dev/dl/) 1.26.11 ou plus récent (version exigée par `go.mod`) ; pour l'application, Wails v2 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1`) et, sous Linux, `sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev`.
 
 ```bash
 git clone https://github.com/TUTODECODE-FR/T2C-Phantom.git && cd T2C-Phantom
@@ -102,12 +114,24 @@ KEY=985c6d08ed885e08d69611f861595b7d4d6ae7a11a0cfc4c6a7f8267fa2d984f   # clé pu
 go build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY" -o t2c ./cmd/t2c
 go build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY" -o t2c-peer ./cmd/t2c-peer
 
+export T2C_NO_BROWSER_SETUP=1 T2C_DATA_DIR=./donnees-test   # isole tout dans ./donnees-test
+./t2c doctor                                    # diagnostic (relais joignables, port, dossier)
 ./t2c-peer list                                 # catalogue signé et bénévoles en ligne
-T2C_NO_BROWSER_SETUP=1 T2C_DATA_DIR=./donnees-test ./t2c start -proxy 18080 -no-volunteer   # client isolé
-curl -x http://127.0.0.1:18080 http://tutodecode.t2c/                # un site .t2c via le proxy local
+./t2c start -proxy 18080 -no-volunteer          # client + proxy local ; laisse-le tourner (Ctrl+C pour arrêter)
+```
 
-cd desktop && wails dev                         # application en mode développement
-wails build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY"           # application finale
+Dans un **second terminal**, depuis le même dossier :
+
+```bash
+curl -x http://127.0.0.1:18080 http://tutodecode.t2c/                                              # HTTP
+curl --cacert ./donnees-test/asso-ca/asso-ca.crt -x http://127.0.0.1:18080 https://tutodecode.t2c/  # HTTPS, certificat local
+```
+
+Application de bureau :
+
+```bash
+cd desktop && wails dev                                            # mode développement
+wails build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY"         # résultat dans desktop/build/bin/ (« T2C Phantom.app », T2C-Phantom.exe ou T2C-Phantom)
 ```
 
 `T2C_NO_BROWSER_SETUP=1` empêche toute modification des réglages de ton système et de tes navigateurs ; `T2C_DATA_DIR` isole l'identité et les données de test. Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont construites par GitHub Actions ([release.yml](.github/workflows/release.yml)) puis recopiées sur GitLab, fichiers et sommes de contrôle vérifiés avant la copie.

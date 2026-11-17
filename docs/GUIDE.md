@@ -17,6 +17,7 @@ Ce guide explique tout : ce qu'est T2C Phantom, ce que tu peux en faire, comment
 - [13. Désinstaller](#13-désinstaller)
 - [14. Limites connues](#14-limites-connues)
 - [15. Questions fréquentes](#15-questions-fréquentes)
+- [16. Glossaire](#16-glossaire)
 
 ---
 
@@ -61,8 +62,11 @@ sha256sum -c SHA256SUMS.txt --ignore-missing         # Linux
 ```
 
 ```powershell
-Get-FileHash T2C-Phantom-Windows-amd64.zip           # Windows : compare avec SHA256SUMS.txt
+# Windows (PowerShell) : affiche la ligne correspondante si le fichier est intact
+Select-String -Path SHA256SUMS.txt -Pattern (Get-FileHash T2C-Phantom-Windows-amd64.zip -Algorithm SHA256).Hash.ToLower()
 ```
+
+Lance ces commandes dans le dossier où se trouvent le fichier et `SHA256SUMS.txt`. Le fichier doit être marqué `OK` (sous Windows, la ligne doit s'afficher). Sinon, ne l'ouvre pas et retélécharge-le : un téléchargement interrompu suffit à fausser la somme.
 
 | Système | Fichier | Installation |
 |---|---|---|
@@ -207,7 +211,7 @@ Si quelqu'un interroge un relais ou un bénévole sur « qui a demandé quoi »,
 ### 7.9 Intégration au navigateur
 
 - **Certificat local** limité aux noms `.t2c` (contrainte de nom critique) : même volé, il ne permet d'imiter aucun autre site.
-- **Fichier PAC** : seuls les `*.t2c` sont envoyés au proxy local (`127.0.0.1:8080`), tout le reste part directement.
+- **Fichier PAC** : seuls les `*.t2c` sont envoyés au proxy local (`127.0.0.1`, port 8080 par défaut, modifiable par `T2C_PROXY_PORT`), tout le reste part directement.
 - Firefox, Zen et LibreWolf sont réglés pour lire les certificats du système.
 - Le proxy local n'accepte que les sites du catalogue signé et refuse tout le reste (ce n'est pas un proxy ouvert).
 
@@ -252,10 +256,30 @@ Précisions :
 
 ## 10. Ligne de commande
 
-Pour un serveur, un Raspberry Pi ou sans interface graphique, télécharge l'archive `t2c-cli-…` de ton système. Elle contient `t2c` et `t2c-peer`.
+Pour un serveur, un Raspberry Pi ou sans interface graphique, télécharge l'archive `t2c-cli-<version>-<système>-<architecture>` de ton système :
+
+| Système | Archive |
+|---|---|
+| macOS Apple Silicon (M1, M2…) | `t2c-cli-<version>-darwin-arm64.tar.gz` |
+| macOS Intel | `t2c-cli-<version>-darwin-amd64.tar.gz` |
+| Linux x86_64 | `t2c-cli-<version>-linux-amd64.tar.gz` |
+| Linux ARM 64 bits (Raspberry Pi 4/5…) | `t2c-cli-<version>-linux-arm64.tar.gz` |
+| Windows | `t2c-cli-<version>-windows-amd64.zip` |
+
+L'archive contient un dossier du même nom, avec `t2c` et `t2c-peer` (`t2c.exe` et `t2c-peer.exe` sous Windows). Par exemple, pour la v2.4.3 sur un Mac Apple Silicon :
 
 ```bash
-./t2c doctor          # diagnostic : clé racine, relais, port 8080, dossier de données
+tar xzf t2c-cli-v2.4.3-darwin-arm64.tar.gz && cd t2c-cli-v2.4.3-darwin-arm64 && ./t2c doctor
+```
+
+```powershell
+Expand-Archive t2c-cli-v2.4.3-windows-amd64.zip; cd t2c-cli-v2.4.3-windows-amd64\t2c-cli-v2.4.3-windows-amd64; .\t2c.exe doctor
+```
+
+Sous Windows, remplace `./t2c` par `.\t2c.exe` dans les commandes ci-dessous.
+
+```bash
+./t2c doctor          # diagnostic : clé racine, relais joignables, port du proxy, dossier de données
 ./t2c setup           # configure les navigateurs (une fois) : certificat .t2c + proxy PAC
 ./t2c start           # client + proxy .t2c sur 127.0.0.1:8080
 ./t2c unsetup         # remet les réglages proxy d'origine
@@ -296,7 +320,7 @@ Client minimal, sans proxy :
 - `peer/sites/` : les sites vérifiés, prêts à être servis.
 - `asso-ca/` : le certificat local `.t2c`.
 
-La variable `T2C_DATA_DIR` permet de changer ce dossier.
+La variable `T2C_DATA_DIR` permet de changer ce dossier. L'outil `t2c-peer` garde ses propres données dans `$T2C_DATA_DIR/t2c-peer` si la variable est définie, sinon dans le dossier de configuration de l'utilisateur (`~/Library/Application Support/t2c-peer` sur macOS) ; l'option `-data` permet d'en choisir un autre.
 
 ---
 
@@ -304,7 +328,7 @@ La variable `T2C_DATA_DIR` permet de changer ce dossier.
 
 | Symptôme | Solution |
 |---|---|
-| « Connexion… » qui ne passe pas à « Connecté » | Vérifie ta connexion Internet. L'application essaie tour à tour tous les relais connus. En ligne de commande : `t2c doctor`. |
+| « Connexion… » qui ne passe pas à « Connecté » | Vérifie ta connexion Internet. L'application essaie tour à tour tous les relais connus. En ligne de commande : `t2c doctor`. Une ligne `[info] relais … injoignable` n'est pas une panne tant qu'un autre relais est marqué `[ok]` (par exemple, le nom de domaine principal n'est pas encore actif). |
 | Le navigateur affiche « non sécurisé » sur un `.t2c` | **Réglages** → **Refaire l'assistant**, puis ferme complètement et rouvre le navigateur. |
 | « … n'est pas dans le catalogue signé » | Ce site n'existe pas ou plus : seul le catalogue officiel est servi. |
 | Un site non `.t2c` ne charge plus | Quitte et relance l'application (le PAC est remis). En dernier recours : `t2c unsetup`. |
@@ -356,3 +380,35 @@ Rien de grave : l'application en crée une nouvelle. Tu perds seulement ton scor
 
 **Comment signaler un problème ?**
 Bug ou question : les issues du dépôt ou `contact@tutodecode.org`. Faille de sécurité : en privé, voir [SECURITY.md](../SECURITY.md).
+
+---
+
+## 16. Glossaire
+
+| Terme | Sens |
+|---|---|
+| **`.t2c`** | Extension des sites du réseau T2C Phantom. Elle n'existe que sur ton ordinateur : le proxy local l'intercepte. |
+| **Pair à pair (P2P)** | Les membres s'échangent les sites entre eux, au lieu de tout télécharger depuis un serveur unique. |
+| **Bénévole** | Membre qui accepte de garder une copie de certains sites et de la redistribuer. |
+| **Relais** | Machine du réseau par laquelle passent tous les échanges, pour que personne ne se connecte directement à personne. |
+| **Relais caché** | Relais qui n'écoute rien sur Internet : il se connecte lui-même au relais principal. |
+| **Fédération** | Plusieurs relais reliés entre eux et partageant l'annuaire des bénévoles. |
+| **Serveur d'origine** | Serveur de TUTODECODE qui détient la version de référence des sites ; joint uniquement par le relais principal. |
+| **Clé pseudonyme** | Identité aléatoire créée sur ton ordinateur ; elle te distingue sans révéler qui tu es. |
+| **Preuve de travail (PoW)** | Petit calcul imposé à la création d'une identité, pour empêcher d'en fabriquer des milliers. |
+| **Signature** | Preuve mathématique qu'un document vient bien de TUTODECODE et n'a pas été modifié. |
+| **Empreinte (SHA-256)** | « Résumé » unique d'un fichier ; la moindre modification change l'empreinte. |
+| **Catalogue** | Liste officielle et signée des sites `.t2c`. |
+| **Manifeste** | Liste signée des empreintes de chaque morceau d'un site. |
+| **Ticket** | Autorisation signée qui permet à un bénévole d'héberger une version d'un site. |
+| **Chiffrement de bout en bout (Noise)** | Seuls les deux membres qui échangent peuvent lire ; les relais transmettent sans comprendre. |
+| **Routage en oignon** | Chiffrement en plusieurs couches, retirées une à une par les relais du circuit ; aucun ne voit tout. |
+| **Circuit** | Chemin chiffré à travers 2 ou 3 relais, utilisé par le mode anonyme. |
+| **Pseudonyme jetable** | Identité temporaire propre à un circuit, renouvelée toutes les 10 minutes. |
+| **Cellule leurre** | Fausse cellule envoyée pour masquer le rythme réel de ton activité. |
+| **TLS** | Chiffrement des connexions sur Internet (le « s » de https). |
+| **SNI** | Nom du site annoncé au début d'une connexion TLS ; ici, toujours celui du relais, jamais le nom `.t2c`. |
+| **Proxy** | Intermédiaire local (sur ton ordinateur) qui reçoit les demandes `.t2c` de ton navigateur. |
+| **PAC** | Petit fichier de configuration qui indique au navigateur d'envoyer seulement les `.t2c` au proxy. |
+| **Certificat local** | Certificat créé sur ton ordinateur pour afficher les `.t2c` en HTTPS ; limité aux noms `.t2c`. |
+| **Cloudflare** | Service placé devant le relais principal : il cache son adresse et absorbe les attaques par saturation. |

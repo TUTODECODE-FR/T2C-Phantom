@@ -49,7 +49,7 @@ L'assistant peut être relancé à tout moment : **Réglages**, **Refaire l'assi
 Pour un serveur, un Raspberry Pi ou sans interface graphique, télécharge l'archive `t2c-cli-…` de ton système. Elle contient `t2c` et `t2c-peer`.
 
 ```bash
-./t2c doctor          # diagnostic : clé racine, DNS du relais, port 8080, dossier de données
+./t2c doctor          # diagnostic : clé racine, relais joignables, port du proxy, dossier de données
 ./t2c setup           # configure les navigateurs (une fois) — certificat .t2c + proxy PAC
 ./t2c start           # client + proxy .t2c sur 127.0.0.1:8080 (bénévole seulement avec -host)
 ./t2c unsetup         # remet les réglages proxy d'origine
