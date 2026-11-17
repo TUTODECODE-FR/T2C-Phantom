@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	mrand "math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -188,14 +189,21 @@ func (n *Node) reconcile(ctx context.Context, c *peerclient.Client) {
 
 func (n *Node) relaysPath() string { return filepath.Join(n.cfg.DataDir, "relays.json") }
 
-// relayCandidates : relais préféré, puis ceux appris (liste signée), puis les défauts.
+// relayCandidates : relais choisi par l'utilisateur, sinon les relais de la
+// liste signée dans un ordre aléatoire (les utilisateurs se répartissent entre
+// les relais de la fédération), puis les relais par défaut.
 func (n *Node) relayCandidates() []string {
 	var learned []string
 	if b, err := os.ReadFile(n.relaysPath()); err == nil {
 		_ = json.Unmarshal(b, &learned)
 	}
+	mrand.Shuffle(len(learned), func(i, j int) { learned[i], learned[j] = learned[j], learned[i] })
+	first := []string{}
+	if n.cfg.RelayURL != "" && n.cfg.RelayURL != DefaultRelay {
+		first = append(first, n.cfg.RelayURL)
+	}
 	var out []string
-	for _, u := range append(append([]string{n.cfg.RelayURL}, learned...), DefaultRelays...) {
+	for _, u := range append(append(first, learned...), DefaultRelays...) {
 		if validRelay(u) && !slices.Contains(out, u) {
 			out = append(out, u)
 		}
@@ -217,7 +225,8 @@ func (n *Node) learnRelays(ctx context.Context, c *peerclient.Client) {
 	}
 	var urls []string
 	for _, u := range hl.Bootstrap {
-		if validRelay(u) && len(urls) < 16 {
+		u, _, _ = strings.Cut(u, "#") // la clé du relais (#k=…) ne sert qu'entre relais
+		if validRelay(u) && len(urls) < 16 && !slices.Contains(urls, u) {
 			urls = append(urls, u)
 		}
 	}
