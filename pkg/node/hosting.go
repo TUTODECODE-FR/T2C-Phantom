@@ -252,6 +252,7 @@ func validRelay(u string) bool {
 func (n *Node) learnRelaysRetry(ctx context.Context, c *peerclient.Client) {
 	for i := 0; i < 10; i++ {
 		if n.learnRelays(ctx, c) {
+			n.upgradeToAnonymous(c)
 			return
 		}
 		select {
@@ -261,6 +262,21 @@ func (n *Node) learnRelaysRetry(ctx context.Context, c *peerclient.Client) {
 			return
 		case <-time.After(time.Duration(i+1) * time.Second):
 		}
+	}
+}
+
+// upgradeToAnonymous : si la liste apprise rend l'anonymat possible alors que
+// la connexion actuelle ne l'est pas, on se reconnecte (cette fois par un circuit).
+func (n *Node) upgradeToAnonymous(c *peerclient.Client) {
+	if n.cfg.NoAnonymity || c.Anonymous() {
+		return
+	}
+	n.mu.Lock()
+	url := n.relay
+	n.mu.Unlock()
+	keys := n.relayKeys()
+	if peerclient.AnonymityPossible(entryKey(url, keys), keys) {
+		_ = c.Close()
 	}
 }
 
