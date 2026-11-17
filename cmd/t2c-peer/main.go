@@ -30,7 +30,7 @@ func die(f string, a ...any) {
 
 func main() {
 	relay := flag.String("relay", "", "URL WebSocket du relais (défaut : relais par défaut du réseau, essayés dans l'ordre)")
-	data := flag.String("data", defaultDataDir(), "dossier de données (identité, copies hébergées)")
+	data := flag.String("data", defaultDataDir(), "dossier de données (identité, copies hébergées) ; défaut : $T2C_DATA_DIR/t2c-peer si la variable est définie")
 	bits := flag.Int("mint-bits", peerid.DefaultMintBits, "PoW d'identité (à la création)")
 	flag.Parse()
 	relays = node.DefaultRelays
@@ -171,6 +171,9 @@ func sleep(ctx context.Context, d time.Duration) {
 }
 
 func defaultDataDir() string {
+	if d := os.Getenv("T2C_DATA_DIR"); d != "" {
+		return filepath.Join(d, "t2c-peer")
+	}
 	if d, err := os.UserConfigDir(); err == nil {
 		return filepath.Join(d, "t2c-peer")
 	}

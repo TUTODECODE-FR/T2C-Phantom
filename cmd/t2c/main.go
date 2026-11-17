@@ -59,8 +59,8 @@ func runStart(args []string) {
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
 	relay := fs.String("relay", envOr("T2C_RELAY_URL", node.DefaultRelay), "URL WebSocket du relais (Cloudflare → VPS)")
 	proxyPort := fs.Int("proxy", 8080, "port du proxy local .t2c (0 = désactivé)")
-	host := fs.String("host", "", "sites à héberger dès le démarrage (séparés par des virgules)")
-	noVolunteer := fs.Bool("no-volunteer", false, "ne pas héberger de copie des sites visités")
+	host := fs.String("host", "", "sites à héberger en tant que bénévole (séparés par des virgules) ; sans cette option, aucun site n'est hébergé")
+	noVolunteer := fs.Bool("no-volunteer", false, "n'héberger aucune copie, même avec -host")
 	carnetPath := fs.String("carnet", utils.GetPath("carnet.json"), "alias locaux (JSON alias.t2c → site)")
 	metricsPort := fs.Int("metrics-port", 0, "métriques Prometheus sur 127.0.0.1:<port> (0 = off)")
 	mintBits := fs.Int("mint-bits", peerid.DefaultMintBits, "PoW d'identité à la création")
@@ -141,6 +141,20 @@ func runID(args []string) {
 	fmt.Println("Supprimer ce fichier = nouvelle identité (nouvelle PoW, score repart de zéro).")
 }
 
+// shortErr : message d'erreur réseau lisible (sans la pile d'adresses).
+func shortErr(err error) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "no such host"):
+		return "nom inconnu (domaine pas encore actif ?)"
+	case strings.Contains(msg, "timeout"):
+		return "délai dépassé"
+	case strings.Contains(msg, "refused"):
+		return "connexion refusée"
+	}
+	return msg
+}
+
 func runDoctor() {
 	fmt.Println("== Diagnostic T2C Phantom ==")
 	if _, err := trust.RootKey(); err != nil {
@@ -148,20 +162,40 @@ func runDoctor() {
 	} else {
 		fmt.Println("[ok] clé racine intégrée")
 	}
-	relay := envOr("T2C_RELAY_URL", node.DefaultRelay)
-	if u, err := url.Parse(relay); err == nil {
-		h := u.Hostname()
-		if _, err := net.LookupHost(h); err != nil {
-			fmt.Println("[erreur] DNS du relais", h, ":", err)
-		} else {
-			fmt.Println("[ok] DNS du relais", h)
-		}
+	// relais : on teste une vraie connexion à chacun (un relais injoignable
+	// n'est pas une panne tant qu'un autre répond)
+	relays := node.DefaultRelays
+	if u := os.Getenv("T2C_RELAY_URL"); u != "" {
+		relays = append([]string{u}, relays...)
 	}
-	if l, err := net.Listen("tcp", "127.0.0.1:8080"); err != nil {
-		fmt.Println("[attention] port 8080 déjà utilisé (proxy déjà lancé ?)")
+	ok := 0
+	for _, r := range relays {
+		u, err := url.Parse(r)
+		if err != nil {
+			continue
+		}
+		host := u.Host
+		if u.Port() == "" {
+			host += ":443"
+		}
+		c, err := net.DialTimeout("tcp", host, 6*time.Second)
+		if err != nil {
+			fmt.Println("[info] relais", u.Hostname(), "injoignable :", shortErr(err))
+			continue
+		}
+		c.Close()
+		ok++
+		fmt.Println("[ok] relais joignable :", u.Hostname())
+	}
+	if ok == 0 {
+		fmt.Println("[erreur] aucun relais joignable : vérifie ta connexion Internet")
+	}
+	port := envOr("T2C_PROXY_PORT", "8080")
+	if l, err := net.Listen("tcp", "127.0.0.1:"+port); err != nil {
+		fmt.Printf("[attention] port %s déjà utilisé (T2C Phantom déjà lancé ? sinon T2C_PROXY_PORT=autre port)\n", port)
 	} else {
 		l.Close()
-		fmt.Println("[ok] port 8080 libre")
+		fmt.Printf("[ok] port %s libre pour le proxy\n", port)
 	}
 	if err := os.MkdirAll(dataDir(), 0o700); err != nil {
 		fmt.Println("[erreur] dossier de données :", err)
