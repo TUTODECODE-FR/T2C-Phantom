@@ -120,7 +120,7 @@ wails build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY"           # applicati
 
 **Pourquoi passer par Cloudflare, un acteur centralisé ?** Choix pragmatique, assumé et limité :
 - **Ce qu'il apporte** : il cache l'adresse du relais (personne ne peut l'attaquer directement) et absorbe les attaques par saturation, ce qu'un petit relais associatif ne peut pas faire seul.
-- **Ce qu'il voit** : ton IP, comme tout point d'entrée (une connexion révèle toujours l'adresse de celui qui l'ouvre). En mode anonyme, il ne voit plus les sites demandés : seulement des cellules chiffrées.
+- **Ce qu'il voit** : ton IP, comme tout point d'entrée (une connexion révèle toujours l'adresse de celui qui l'ouvre). Le nom `.t2c` ne circule jamais sur le réseau : le TLS est négocié avec le **domaine du relais** (SNI et en-tête Host du relais). Cloudflare termine toutefois ce TLS : en mode normal, il pourrait lire les demandes (empreintes des sites, rapprochables du catalogue public) ; **en mode anonyme, il ne voit que des cellules chiffrées pour les relais**, ainsi que leur taille et leur rythme, jamais le site demandé.
 - **Ce qu'il ne peut pas faire** : lire les échanges entre membres (chiffrés de bout en bout) ni modifier un site (signatures vérifiées par ton client).
 - **Si même lui ne doit pas connaître ton IP** : passe par un VPN ou Tor avant T2C Phantom. La fédération permet aussi d'ajouter des relais d'entrée qui ne dépendent pas de Cloudflare.
 

@@ -219,7 +219,12 @@ Si quelqu'un interroge un relais ou un bénévole sur « qui a demandé quoi »,
 | **Bénévoles** | non | mode normal : oui ; mode anonyme : pseudonyme jetable | seulement ce qu'ils te fournissent | — |
 | **Serveur d'origine** | non | seulement si tu es bénévole | non : il ne reçoit que des demandes anonymes du relais | — |
 
-Le relais et le serveur ne lisent ni n'enregistrent aucun en-tête contenant une adresse IP, et le serveur refuse toute requête qui en porterait une.
+Précisions :
+
+- Le nom `.t2c` ne circule **jamais** sur le réseau : ton proxy local l'intercepte, et la connexion vers Cloudflare est établie avec le **domaine du relais** (SNI TLS et en-tête Host du relais), dans les deux modes.
+- Cloudflare **termine** cette connexion TLS : il voit en clair les trames échangées avec le relais. En mode normal, ces trames contiennent les demandes (empreintes des sites, rapprochables du catalogue public). En mode anonyme, elles ne contiennent que des cellules chiffrées en couches pour les relais : Cloudflare n'en connaît que la taille et le rythme.
+- Le contenu échangé avec les bénévoles est chiffré de bout en bout (Noise) dans tous les cas.
+- Le relais et le serveur ne lisent ni n'enregistrent aucun en-tête contenant une adresse IP, et le serveur refuse toute requête qui en porterait une.
 
 ---
 

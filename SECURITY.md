@@ -21,7 +21,7 @@ Objectif assumé : **protéger l'adresse IP** des utilisateurs et des bénévole
 | Le proxy capte toute la navigation | Le fichier PAC n'envoie que les `*.t2c` ; tout le reste est en connexion directe |
 
 **Ce qui reste visible (limites assumées)**
-- **Cloudflare** voit ton IP et les sites `.t2c` demandés.
+- **Cloudflare** voit ton IP. Il termine le TLS (négocié avec le domaine du relais, jamais avec un nom `.t2c`) : hors mode anonyme, il pourrait lire les demandes ; en mode anonyme, il ne voit que des cellules chiffrées, leur taille et leur rythme.
 - **Le relais** voit ta clé pseudonyme, les sites demandés et avec quelles clés tu échanges, mais jamais ton IP.
 - Si même Cloudflare ne doit pas connaître ton IP, utilise un VPN ou Tor *avant* T2C Phantom (logiciels tiers, sous ta responsabilité).
 - Un poste compromis (logiciel malveillant, keylogger) est hors de portée de toute protection réseau.
