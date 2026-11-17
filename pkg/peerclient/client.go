@@ -31,6 +31,8 @@ type Options struct {
 	Guard   *trust.VersionGuard // nil = garde en mémoire
 	Workers int                 // téléchargements parallèles (défaut 6)
 	Header  http.Header         // headers de la requête WebSocket (tests : simuler Cloudflare)
+	// UploadBytesPerSec : débit maximal envoyé aux autres pairs (0 = illimité).
+	UploadBytesPerSec int64
 }
 
 type Client struct {
@@ -48,6 +50,8 @@ type Client struct {
 	closed   bool
 	done     chan struct{}
 	serveSem chan struct{}
+	upload   *rateLimiter
+	served   atomic.Int64 // octets servis à d'autres pairs
 }
 
 type outSession struct {
@@ -82,6 +86,7 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 		id: id, opt: opt, conn: wire.NewConn(ws), rep: NewReputation(),
 		pending: map[uint64]chan *wire.Frame{}, outs: map[uint64]*outSession{},
 		tickets: map[string]trust.Ticket{}, done: make(chan struct{}), serveSem: make(chan struct{}, 8),
+		upload: newRateLimiter(opt.UploadBytesPerSec),
 	}
 	c.guard = opt.Guard
 	if c.guard == nil {
@@ -426,8 +431,13 @@ func (c *Client) serve(from string, sid uint64, msg1 []byte) {
 			resp = encodeResponse(stOK, data)
 		} else {
 			resp = encodeResponse(stErr, []byte("non hébergé"))
+			if errors.Is(err, ErrCorrupt) {
+				go c.dropCorrupt(req.Root)
+			}
 		}
 	}
+	c.upload.wait(len(resp))
+	c.served.Add(int64(len(resp)))
 	first := resp
 	if len(first) > partSize {
 		first = resp[:partSize]
@@ -611,18 +621,37 @@ func (c *Client) Announce(ctx context.Context) error {
 		}
 	}
 	c.mu.Unlock()
-	if len(ts) == 0 {
-		return nil
-	}
+	// l'annonce remplace l'ensemble annoncé : une liste vide retire tout
 	r, err := c.request(ctx, &wire.Frame{T: wire.TAnnounce, H: wire.Header{Tickets: ts}})
 	if err != nil {
 		return err
 	}
-	if r.H.Index == 0 {
+	if len(ts) > 0 && r.H.Index == 0 {
 		return errors.New("aucun ticket accepté")
 	}
 	return nil
 }
+
+// Unhost : arrête d'héberger root (ticket abandonné, annonce mise à jour).
+// La copie locale est à supprimer par l'appelant (ContentStore.Remove).
+func (c *Client) Unhost(ctx context.Context, root string) error {
+	c.mu.Lock()
+	delete(c.tickets, root)
+	c.mu.Unlock()
+	return c.Announce(ctx)
+}
+
+// dropCorrupt : copie altérée sur le disque → supprimée et retirée de
+// l'annuaire ; elle sera retéléchargée (vérifiée) au prochain alignement.
+func (c *Client) dropCorrupt(root string) {
+	c.opt.Store.Remove(root)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	_ = c.Unhost(ctx, root)
+}
+
+// Served : octets envoyés à d'autres pairs depuis la connexion.
+func (c *Client) Served() int64 { return c.served.Load() }
 
 // Tickets : copie des tickets détenus (pour les transférer à une nouvelle connexion).
 func (c *Client) Tickets() []trust.Ticket {
