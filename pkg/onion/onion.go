@@ -264,4 +264,6 @@ const (
 	CmdExtended byte = 2 // dernier saut → client : [réponse 64o]
 	CmdBegin    byte = 3 // client → sortie : pseudonyme jetable du circuit
 	CmdFrame    byte = 4 // trame wire encodée (requête du client ou réponse de la sortie)
+	CmdPadded   byte = 5 // enveloppe de taille fixe : [5][longueur 4o][commande][remplissage]
+	CmdDrop     byte = 6 // cellule leurre : ignorée par celui qui la reçoit
 )

@@ -98,3 +98,35 @@ func TestImpostorRelayRejected(t *testing.T) {
 		t.Fatal("cellule altérée acceptée")
 	}
 }
+
+func TestPadding(t *testing.T) {
+	sizes := map[int]bool{}
+	for _, n := range []int{1, 40, 900, 1019, 1020, 5000, 60000, 262_300} {
+		p := bytes.Repeat([]byte{CmdFrame}, n)
+		c, ok := Pad(p)
+		if !ok {
+			t.Fatalf("%d octets non enveloppés", n)
+		}
+		sizes[len(c)] = true
+		got, ok := Unpad(c)
+		if !ok || !bytes.Equal(got, p) {
+			t.Fatalf("aller-retour %d octets", n)
+		}
+	}
+	if len(sizes) > 4 {
+		t.Fatalf("trop de tailles visibles: %v", sizes)
+	}
+	// une recherche et une cellule leurre ont la même taille
+	small, _ := Pad([]byte{CmdFrame, 1, 2, 3})
+	if len(small) != len(Drop()) {
+		t.Fatal("cellule leurre discernable par sa taille")
+	}
+	if _, ok := Pad(make([]byte, MaxCell)); ok {
+		t.Fatal("commande trop grande acceptée")
+	}
+	for _, bad := range [][]byte{nil, {CmdPadded}, {CmdPadded, 0, 0, 0, 0}, {CmdPadded, 0, 0, 1, 0, 1}} {
+		if _, ok := Unpad(bad); ok {
+			t.Fatalf("enveloppe invalide acceptée: %v", bad)
+		}
+	}
+}
