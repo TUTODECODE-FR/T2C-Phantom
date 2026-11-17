@@ -101,7 +101,8 @@ Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont con
 - **v2.0** — pairs pseudonymes, bénévoles audités, sites signés, application multi-OS, configuration automatique des navigateurs.
 - **v2.1** — zéro confiance : clé racine hors ligne, serveur sans clé de publication, relais sans secret.
 - **v2.2** — assistant de premier lancement, carnet de sites, bénévolat choisi site par site avec copies chiffrées, liste de relais signée.
-- **Ensuite** — relais bénévoles (plusieurs points d'entrée), puis routage en oignon à travers eux pour l'anonymat complet.
+- **v2.3** — fédération de relais : plusieurs points d'entrée reliés entre eux.
+- **v2.4** — mode anonyme : routage en oignon à travers les relais, pseudonyme jetable, échec fermé.
 - **Plus tard** — applications signées (Apple / Windows), mises à jour automatiques.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">

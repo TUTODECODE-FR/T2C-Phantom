@@ -60,6 +60,19 @@ Les relais se relient entre eux par une liaison authentifiée des deux côtés. 
 
 Chaque relais ne voit que l'IP des personnes qui se connectent à lui, jamais le contenu des échanges entre membres.
 
+## Mode anonyme (routage en oignon)
+
+Dès que le réseau compte au moins deux relais, l'application passe d'elle-même en mode anonyme (badge « Anonyme » en haut de la fenêtre) :
+
+- tes demandes traversent un **circuit** de 2 ou 3 relais différents, chiffré une fois par relais ;
+- le **relais d'entrée** connaît ton adresse IP mais ne peut rien lire de ce que tu demandes ;
+- le **relais de sortie** lit les demandes (quel site, quels morceaux) mais ne connaît ni ton IP ni ton identité : seulement un **pseudonyme jetable**, renouvelé toutes les 10 minutes ;
+- les **bénévoles** ne voient que ce pseudonyme ;
+- chaque relais négocie des clés éphémères : même une clé de relais volée plus tard ne déchiffre pas un échange passé ;
+- **échec fermé** : si le circuit tombe, l'application n'envoie rien en clair à la place, elle en reconstruit un.
+
+Limites : l'anonymat suppose que les relais du circuit ne s'entendent pas entre eux (comme pour Tor). Le rôle de bénévole n'est pas anonyme vis-à-vis de son relais, qui sait quels sites il héberge. Avec un seul relais dans le réseau, le mode anonyme reste inactif.
+
 ## Chiffrement de bout en bout
 
 Les échanges entre deux pairs utilisent le protocole **Noise IK** (X25519, ChaCha20-Poly1305, BLAKE2s). Le relais transmet les messages sans pouvoir les lire ni les modifier. Il ne voit que leur taille et les deux clés concernées.
