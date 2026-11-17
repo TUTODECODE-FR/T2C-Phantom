@@ -171,6 +171,9 @@ func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {
 			"chunksPeers":  st.FromPeers,
 			"chunksOrigin": st.FromOrigin,
 			"badChunks":    st.BadChunks,
+			"anonymous":    st.Anonymous,
+			"circuitHops":  st.Hops,
+			"relays":       st.Relays,
 		}
 	}
 	writeJSON(w, out)

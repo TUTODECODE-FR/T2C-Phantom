@@ -204,6 +204,7 @@ func (n *Node) relayCandidates() []string {
 	}
 	var out []string
 	for _, u := range append(append(first, learned...), DefaultRelays...) {
+		u, _, _ = strings.Cut(u, "#")
 		if validRelay(u) && !slices.Contains(out, u) {
 			out = append(out, u)
 		}
@@ -211,25 +212,76 @@ func (n *Node) relayCandidates() []string {
 	return out
 }
 
+// relayKeys : relais de la liste signée avec leur clé (pour bâtir des circuits).
+func (n *Node) relayKeys() []peerclient.RelayKey {
+	var learned []string
+	if b, err := os.ReadFile(n.relaysPath()); err == nil {
+		_ = json.Unmarshal(b, &learned)
+	}
+	var out []peerclient.RelayKey
+	for _, e := range learned {
+		u, frag, ok := strings.Cut(e, "#")
+		if !ok || !strings.HasPrefix(frag, "k=") {
+			continue
+		}
+		k, err := trust.ParsePublicKey(strings.TrimPrefix(frag, "k="))
+		if err != nil {
+			continue
+		}
+		out = append(out, peerclient.RelayKey{URL: u, Key: k})
+	}
+	return out
+}
+
+// entryKey : clé du relais d'URL url, si la liste signée la donne.
+func entryKey(url string, relays []peerclient.RelayKey) []byte {
+	for _, r := range relays {
+		if r.URL == url {
+			return r.Key
+		}
+	}
+	return nil
+}
+
 func validRelay(u string) bool {
 	return strings.HasPrefix(u, "wss://") || strings.HasPrefix(u, "ws://127.0.0.1") || strings.HasPrefix(u, "ws://localhost")
 }
 
+// learnRelaysRetry : la liste peut être momentanément indisponible (relais qui
+// rejoint juste son amont) : on réessaie quelques fois.
+func (n *Node) learnRelaysRetry(ctx context.Context, c *peerclient.Client) {
+	for i := 0; i < 10; i++ {
+		if n.learnRelays(ctx, c) {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-c.Done():
+			return
+		case <-time.After(time.Duration(i+1) * time.Second):
+		}
+	}
+}
+
 // learnRelays retient les relais publiés dans la liste signée hosts.json.
-func (n *Node) learnRelays(ctx context.Context, c *peerclient.Client) {
+func (n *Node) learnRelays(ctx context.Context, c *peerclient.Client) bool {
 	hctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	hl, err := c.Hosts(hctx)
-	if err != nil || len(hl.Bootstrap) == 0 {
-		return
+	if err != nil {
+		return false
+	}
+	if len(hl.Bootstrap) == 0 {
+		return true
 	}
 	var urls []string
-	for _, u := range hl.Bootstrap {
-		u, _, _ = strings.Cut(u, "#") // la clé du relais (#k=…) ne sert qu'entre relais
+	for _, u := range hl.Bootstrap { // « url#k=clé » : la clé sert aux circuits anonymes
 		if validRelay(u) && len(urls) < 16 && !slices.Contains(urls, u) {
 			urls = append(urls, u)
 		}
 	}
 	b, _ := json.Marshal(urls)
 	_ = os.WriteFile(n.relaysPath(), b, 0o600)
+	return true
 }

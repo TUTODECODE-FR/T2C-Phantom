@@ -45,6 +45,7 @@ strong { font-weight: 700; }
 .pill .dot { width: 8px; height: 8px; background: var(--muted); }
 .pill.on { border-color: var(--ok); color: var(--ok); }
 .pill.on .dot { background: var(--ok); }
+.pill.anon { border-color: var(--accent); color: var(--accent); }
 .pill.wait { border-color: var(--warn); color: var(--warn); }
 .pill.wait .dot { background: var(--warn); animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: .3; } }

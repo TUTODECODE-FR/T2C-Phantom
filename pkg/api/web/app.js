@@ -184,6 +184,9 @@ async function pollStatus() {
     }
     pill.className = 'pill ' + cls;
     $('statusText').textContent = txt;
+    const anon = s.status === 'running' && s.connected && s.anonymous;
+    $('anonPill').hidden = !anon;
+    $('anonPill').title = anon ? `Tes demandes traversent ${s.circuitHops} relais : aucun ne connaît à la fois ton adresse et ce que tu consultes.` : '';
     if (!$('home').hidden) renderStatusDetails(s);
 }
 
@@ -194,6 +197,15 @@ function renderStatusDetails(s) {
         ? `${s.chunksPeers || 0} morceaux de bénévoles · ${s.chunksOrigin || 0} du serveur · ${s.badChunks || 0} faux rejetés`
         : '—';
     $('lastError').textContent = s.lastError ? 'Dernier message : ' + s.lastError : '';
+    if (s.status !== 'running' || !s.connected) {
+        $('myAnon').textContent = '—';
+    } else if (s.anonymous) {
+        $('myAnon').textContent = `actif : circuit à travers ${s.circuitHops} relais, pseudonyme renouvelé toutes les 10 minutes`;
+    } else {
+        $('myAnon').textContent = (s.relays || 0) < 2
+            ? 'inactif : le réseau ne compte qu\'un relais (il s\'activera dès qu\'un deuxième relais rejoindra la fédération)'
+            : 'inactif : connexion en cours au relais d\'entrée';
+    }
     if (s.catalogVer) $('catalogInfo').textContent = `catalogue signé v${s.catalogVer}`;
 }
 

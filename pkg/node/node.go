@@ -40,6 +40,8 @@ type Config struct {
 	Volunteer bool     // compatibilité : avec HostSites, choix initial des sites hébergés
 	HostSites []string // sites à héberger si aucun choix n'est encore enregistré
 	Carnet    map[string]string
+	// NoAnonymity : désactive les circuits en oignon (tests, dépannage).
+	NoAnonymity bool
 }
 
 type HostedSite struct {
@@ -54,6 +56,9 @@ type Status struct {
 	Relay      string       `json:"relay"`
 	Volunteer  bool         `json:"volunteer"`
 	Hosting    Hosting      `json:"hosting"`
+	Anonymous  bool         `json:"anonymous"`    // demandes par circuit en oignon
+	Hops       int          `json:"circuit_hops"` // relais du circuit
+	Relays     int          `json:"relays"`       // relais connus dans la liste signée
 	StoreBytes int64        `json:"store_bytes"`
 	Served     int64        `json:"served_bytes"`
 	Hosted     []HostedSite `json:"hosted"`
@@ -161,10 +166,15 @@ func (n *Node) run(ctx context.Context) {
 		relays := n.relayCandidates()
 		url := relays[attempt%len(relays)]
 		attempt++
-		dctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		// anonymat automatique dès que la liste signée compte au moins deux relais
+		keys := n.relayKeys()
+		entry := entryKey(url, keys)
+		anon := !n.cfg.NoAnonymity && peerclient.AnonymityPossible(entry, keys)
+		dctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		c, err := peerclient.Dial(dctx, url, n.id, peerclient.Options{
 			RootKey: n.cfg.RootKey, Store: n.store, Guard: n.guard,
 			UploadBytesPerSec: n.hostingPrefs().MaxUploadKBs * 1024,
+			Anonymous:         anon, EntryKey: entry, Relays: keys,
 		})
 		cancel()
 		if err != nil {
@@ -207,7 +217,7 @@ func (n *Node) onConnect(ctx context.Context, c *peerclient.Client) {
 	if _, err := n.refreshCatalog(ctx, c); err != nil {
 		n.setErr(err)
 	}
-	n.learnRelays(ctx, c)
+	go n.learnRelaysRetry(ctx, c)
 	actx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	_ = c.Announce(actx)
 	cancel()
@@ -426,7 +436,10 @@ func (n *Node) Status() Status {
 	}
 	if n.client != nil {
 		st.Served = n.client.Served()
+		st.Anonymous = n.client.Anonymous()
+		st.Hops = n.client.CircuitHops()
 	}
+	st.Relays = len(n.relayKeys())
 	if n.catalog != nil {
 		st.CatalogVer = n.catalog.Version
 	}
