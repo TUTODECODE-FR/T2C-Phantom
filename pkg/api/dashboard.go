@@ -65,6 +65,13 @@ func (d *Dashboard) APIHandler() http.Handler {
 	mux.HandleFunc("/api/asso-ca.crt", d.handleAssoCAFile)
 	mux.HandleFunc("/api/asso-sites", d.handleAssoSites)
 	mux.HandleFunc("/api/setup", d.handleSetup)
+	mux.HandleFunc("/api/onboarding", d.handleOnboarding)
+	mux.HandleFunc("/api/setup/ca", d.handleSetupCA)
+	mux.HandleFunc("/api/setup/proxy", d.handleSetupProxy)
+	mux.HandleFunc("/api/browsers", d.handleBrowsers)
+	mux.HandleFunc("/api/open", d.handleOpen)
+	mux.HandleFunc("/api/sites", d.handleSites)
+	mux.HandleFunc("/api/hosting", d.handleHosting)
 	return mux
 }
 
@@ -191,33 +198,44 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 		relay = req.RelayAddr
 	}
 	n, err := node.Start(context.Background(), node.Config{
-		RelayURL:  relay,
-		DataDir:   utils.GetPath("peer"),
-		Volunteer: !req.DisableSeeding,
-		Carnet:    LoadCarnet(utils.GetPath("carnet.json")),
+		RelayURL: relay,
+		DataDir:  utils.GetPath("peer"),
+		Carnet:   LoadCarnet(utils.GetPath("carnet.json")),
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	d.node = n
-	d.volunteer = !req.DisableSeeding
-	if !d.proxyOn {
-		d.proxyOn = true
-		go func() {
-			if err := proxy.StartProxyServer(&nodeRef{d: d}, fmt.Sprintf("127.0.0.1:%d", proxyPort)); err != nil {
-				fmt.Println("proxy:", err)
-				d.mu.Lock()
-				d.proxyOn = false
-				d.mu.Unlock()
-			}
-		}()
-	}
+	d.volunteer = n.Status().Volunteer
+	d.ensureProxyLocked()
 	// plug-and-play : si l'utilisateur a déjà accepté la configuration, on remet le PAC
 	if sysint.Enabled(utils.GetT2CDataDir()) && os.Getenv("T2C_NO_BROWSER_SETUP") == "" {
 		go sysint.Reapply(utils.GetT2CDataDir(), fmt.Sprintf("127.0.0.1:%d", proxyPort))
 	}
 	writeJSON(w, map[string]any{"success": true, "address": n.ID(), "seeding": d.volunteer, "role": "pair"})
+}
+
+// ensureProxy démarre le proxy .t2c local (il sert aussi le fichier PAC).
+func (d *Dashboard) ensureProxy() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.ensureProxyLocked()
+}
+
+func (d *Dashboard) ensureProxyLocked() {
+	if d.proxyOn {
+		return
+	}
+	d.proxyOn = true
+	go func() {
+		if err := proxy.StartProxyServer(&nodeRef{d: d}, fmt.Sprintf("127.0.0.1:%d", proxyPort)); err != nil {
+			fmt.Println("proxy:", err)
+			d.mu.Lock()
+			d.proxyOn = false
+			d.mu.Unlock()
+		}
+	}()
 }
 
 func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {

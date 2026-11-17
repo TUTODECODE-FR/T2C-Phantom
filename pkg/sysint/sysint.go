@@ -241,6 +241,19 @@ func nssHas(bin, db, nick, wantFP string) bool {
 // Setup : installe la CA et configure le proxy. Peut afficher des fenêtres
 // d'autorisation du système (mot de passe macOS, avertissement Windows).
 func Setup(dataDir, certPath, nick, proxyAddr string) Report {
+	r := InstallCA(certPath, nick)
+	if len(r.Errors) > 0 && len(r.CA) == 0 {
+		return r
+	}
+	p := EnableProxy(dataDir, proxyAddr)
+	r.CA = append(r.CA, p.CA...)
+	r.Proxy, r.Manual, r.Errors = p.Proxy, append(r.Manual, p.Manual...), append(r.Errors, p.Errors...)
+	return r
+}
+
+// InstallCA : étape 1 de l'assistant. CA locale (limitée aux .t2c) de confiance
+// pour le système et les navigateurs Gecko.
+func InstallCA(certPath, nick string) Report {
 	var r Report
 	der, err := certDER(certPath)
 	if err != nil {
@@ -248,6 +261,17 @@ func Setup(dataDir, certPath, nick, proxyAddr string) Report {
 		return r
 	}
 	installCA(&r, certPath, der, nick)
+	if g := geckoPrefs(true); len(g) > 0 {
+		r.CA = append(r.CA, "Firefox/Zen lisent les CA du système ("+strings.Join(g, ", ")+")")
+	}
+	return r
+}
+
+// EnableProxy : étape 3 de l'assistant. PAC (seuls les *.t2c passent par T2C).
+// Refait le réglage Gecko : un Firefox lancé pour la première fois à l'étape 2
+// a maintenant un profil.
+func EnableProxy(dataDir, proxyAddr string) Report {
+	var r Report
 	if g := geckoPrefs(true); len(g) > 0 {
 		r.CA = append(r.CA, "Firefox/Zen lisent les CA du système ("+strings.Join(g, ", ")+")")
 	}
