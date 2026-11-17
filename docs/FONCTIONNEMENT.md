@@ -52,6 +52,14 @@ Conséquence : **ni un bénévole, ni le relais, ni Cloudflare, ni même un serv
 
 Les téléchargeurs choisissent en priorité les bénévoles les mieux notés, à la fois par l'origine et par leur propre expérience.
 
+## Plusieurs relais (fédération)
+
+Le réseau peut compter plusieurs relais, tenus par des opérateurs de confiance et listés avec leur clé dans la liste signée. Ton application en choisit un au hasard, ce qui répartit la charge.
+
+Les relais se relient entre eux par une liaison authentifiée des deux côtés. Ils partagent l'annuaire des bénévoles et se transmettent les échanges chiffrés : tu peux télécharger chez un bénévole connecté à un autre relais que le tien. Un seul relais joint le serveur d'origine ; les autres passent par lui et ne connaissent jamais son adresse.
+
+Chaque relais ne voit que l'IP des personnes qui se connectent à lui, jamais le contenu des échanges entre membres.
+
 ## Chiffrement de bout en bout
 
 Les échanges entre deux pairs utilisent le protocole **Noise IK** (X25519, ChaCha20-Poly1305, BLAKE2s). Le relais transmet les messages sans pouvoir les lire ni les modifier. Il ne voit que leur taille et les deux clés concernées.
