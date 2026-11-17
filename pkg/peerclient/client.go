@@ -119,6 +119,7 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 		}
 		c.installCircuit(ci)
 		go c.circuitLoop()
+		go c.coverLoop()
 	}
 	return c, nil
 }

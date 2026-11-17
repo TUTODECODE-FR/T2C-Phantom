@@ -46,11 +46,16 @@ type circuit struct {
 	sendMu sync.Mutex
 }
 
-// send chiffre p pour le dernier saut et l'envoie, dans le même ordre.
+// send enveloppe p à une taille fixe, le chiffre pour le dernier saut et
+// l'envoie, dans l'ordre de chiffrement.
 func (ci *circuit) send(conn *wire.Conn, p []byte) error {
+	padded, ok := onion.Pad(p)
+	if !ok {
+		return errors.New("anonymat : commande trop grande")
+	}
 	ci.sendMu.Lock()
 	defer ci.sendMu.Unlock()
-	return conn.Send(&wire.Frame{T: wire.TCircCell, H: wire.Header{Circ: ci.id}, Data: ci.seal(p)})
+	return conn.Send(&wire.Frame{T: wire.TCircCell, H: wire.Header{Circ: ci.id}, Data: ci.seal(padded)})
 }
 
 func (ci *circuit) kill() { ci.once.Do(func() { close(ci.dead) }) }
@@ -221,6 +226,23 @@ func (c *Client) installCircuit(ci *circuit) {
 	}
 }
 
+// coverLoop : cellules leurres à intervalles aléatoires (2 à 8 s), indiscernables
+// des vraies pour les relais d'entrée et intermédiaires : le rythme du trafic
+// ne trahit plus l'activité réelle.
+func (c *Client) coverLoop() {
+	for {
+		wait := 2*time.Second + time.Duration(mrand.Int64N(int64(6*time.Second)))
+		select {
+		case <-c.done:
+			return
+		case <-time.After(wait):
+		}
+		if ci := c.currentCircuit(); ci != nil {
+			_ = ci.send(c.conn, []byte{onion.CmdDrop})
+		}
+	}
+}
+
 // circuitLoop : renouvelle le circuit (et donc le pseudonyme), et le rebâtit s'il tombe.
 func (c *Client) circuitLoop() {
 	t := time.NewTicker(CircuitLife)
@@ -269,6 +291,9 @@ func (c *Client) onCircuitFrame(f *wire.Frame) {
 		if err != nil || len(p) == 0 {
 			ci.kill()
 			return
+		}
+		if inner, ok := onion.Unpad(p); ok {
+			p = inner
 		}
 		switch p[0] {
 		case onion.CmdExtended:
