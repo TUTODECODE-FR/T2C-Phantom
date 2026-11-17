@@ -88,7 +88,7 @@ func runStart(args []string) {
 		fmt.Println("démarrage:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Identité : %s (clé aléatoire — personne ne voit ton IP à part Cloudflare)\n", n.ID())
+	fmt.Printf("Identité : %s (clé aléatoire ; ton IP n'est vue que du point d'entrée : Cloudflare, ou le relais en mode direct)\n", n.ID())
 	fmt.Printf("Relais   : %s\n", *relay)
 	utils.LogSecurityEvent("DAEMON_START", "client démarré", n.ID())
 

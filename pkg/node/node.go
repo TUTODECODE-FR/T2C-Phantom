@@ -27,13 +27,18 @@ import (
 // DefaultRelay : point d'entrée public (Cloudflare → VPS).
 const DefaultRelay = "wss://t2cphantom.eu.org/v1/ws"
 
+// DefaultRelays : relais essayés dans l'ordre. La liste signée (hosts.json,
+// champ bootstrap) reçue à chaque connexion s'y ajoute : plusieurs relais
+// peuvent se partager le réseau.
+var DefaultRelays = []string{DefaultRelay, "wss://185-233-100-85.sslip.io/v1/ws"}
+
 type Config struct {
-	RelayURL  string
+	RelayURL  string // relais préféré (essayé en premier)
 	DataDir   string
 	MintBits  int
 	RootKey   ed25519.PublicKey
-	Volunteer bool     // héberger une copie des sites visités
-	HostSites []string // sites à héberger dès la connexion
+	Volunteer bool     // compatibilité : avec HostSites, choix initial des sites hébergés
+	HostSites []string // sites à héberger si aucun choix n'est encore enregistré
 	Carnet    map[string]string
 }
 
@@ -48,6 +53,9 @@ type Status struct {
 	ID         string       `json:"id"`
 	Relay      string       `json:"relay"`
 	Volunteer  bool         `json:"volunteer"`
+	Hosting    Hosting      `json:"hosting"`
+	StoreBytes int64        `json:"store_bytes"`
+	Served     int64        `json:"served_bytes"`
 	Hosted     []HostedSite `json:"hosted"`
 	CatalogVer uint64       `json:"catalog_version"`
 	LastError  string       `json:"last_error,omitempty"`
@@ -82,6 +90,9 @@ type Node struct {
 	peers     map[string]PeerInfo
 	fetching  map[string]*sync.Mutex // racine → verrou (pas deux téléchargements du même site)
 	stats     struct{ peers, origin, bad int64 }
+	hosting   Hosting
+	relay     string // relais actuellement utilisé
+	recMu     sync.Mutex
 
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -122,6 +133,8 @@ func Start(ctx context.Context, cfg Config) (*Node, error) {
 		done:      make(chan struct{}),
 	}
 	n.loadTickets()
+	n.hosting = n.loadHosting()
+	n.loadStore()
 	ctx, n.cancel = context.WithCancel(ctx)
 	go n.run(ctx)
 	return n, nil
@@ -143,20 +156,28 @@ func (n *Node) Stop() {
 func (n *Node) run(ctx context.Context) {
 	defer close(n.done)
 	backoff := time.Second
+	attempt := 0
 	for ctx.Err() == nil {
-		dctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-		c, err := peerclient.Dial(dctx, n.cfg.RelayURL, n.id, peerclient.Options{
-			RootKey: n.cfg.RootKey, Store: n.storeIfVolunteer(), Guard: n.guard,
+		relays := n.relayCandidates()
+		url := relays[attempt%len(relays)]
+		attempt++
+		dctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		c, err := peerclient.Dial(dctx, url, n.id, peerclient.Options{
+			RootKey: n.cfg.RootKey, Store: n.store, Guard: n.guard,
+			UploadBytesPerSec: n.hostingPrefs().MaxUploadKBs * 1024,
 		})
 		cancel()
 		if err != nil {
-			n.setErr(err)
-			sleep(ctx, backoff)
-			backoff = min(backoff*2, time.Minute)
+			n.setErr(fmt.Errorf("relais %s: %w", url, err))
+			if attempt%len(relays) == 0 { // tous essayés : on patiente
+				sleep(ctx, backoff)
+				backoff = min(backoff*2, time.Minute)
+			}
 			continue
 		}
-		backoff = time.Second
+		backoff, attempt = time.Second, 0
 		n.mu.Lock()
+		n.relay = url
 		n.client = c
 		n.lastErr = ""
 		c.AdoptTickets(n.tickets)
@@ -182,37 +203,15 @@ func (n *Node) run(ctx context.Context) {
 	}
 }
 
-func (n *Node) storeIfVolunteer() *peerclient.ContentStore {
-	if n.cfg.Volunteer {
-		return n.store
-	}
-	return nil
-}
-
 func (n *Node) onConnect(ctx context.Context, c *peerclient.Client) {
 	if _, err := n.refreshCatalog(ctx, c); err != nil {
 		n.setErr(err)
 	}
-	if !n.cfg.Volunteer {
-		return
-	}
-	// recharge les copies déjà hébergées, puis réannonce les tickets valides
-	for _, t := range c.Tickets() {
-		_, _ = n.store.Load(t.Root, n.cfg.RootKey)
-	}
+	n.learnRelays(ctx, c)
 	actx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	_ = c.Announce(actx)
 	cancel()
-	for _, s := range n.cfg.HostSites {
-		go func(site string) {
-			hctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-			defer cancel()
-			if _, err := c.Host(hctx, site); err != nil {
-				n.setErr(fmt.Errorf("bénévolat %s: %w", site, err))
-			}
-			n.saveTickets(c.Tickets())
-		}(s)
-	}
+	go n.hostingLoop(ctx, c)
 }
 
 // waitClient renvoie la connexion courante (attend jusqu'à ctx).
@@ -350,9 +349,9 @@ func (n *Node) SiteDir(ctx context.Context, domain string) (string, *trust.SiteE
 	if err != nil {
 		return "", nil, err
 	}
-	var data []byte
-	if n.cfg.Volunteer {
-		// devient bénévole pour ce site : ticket + copie vérifiée + annonce
+	// copie déjà hébergée (et revérifiée à la lecture) : rien à télécharger
+	data, _ := n.store.Read(e.Root)
+	if data == nil && n.hostingPrefs().wants(e.ID) {
 		if _, err := c.Host(ctx, e.ID); err != nil {
 			n.setErr(fmt.Errorf("bénévolat %s: %w", e.ID, err))
 		} else {
@@ -421,8 +420,12 @@ func (n *Node) Status() Status {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	st := Status{
-		Connected: n.client != nil, ID: n.id.ID(), Relay: n.cfg.RelayURL, Volunteer: n.cfg.Volunteer,
+		Connected: n.client != nil, ID: n.id.ID(), Relay: n.relay, Volunteer: n.hosting.active(),
+		Hosting: n.hosting, StoreBytes: n.store.Size(),
 		LastError: n.lastErr, FromPeers: n.stats.peers, FromOrigin: n.stats.origin, BadChunks: n.stats.bad,
+	}
+	if n.client != nil {
+		st.Served = n.client.Served()
 	}
 	if n.catalog != nil {
 		st.CatalogVer = n.catalog.Version
