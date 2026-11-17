@@ -45,11 +45,11 @@ Télécharge la dernière version dans les **[Releases](https://github.com/TUTOD
 
 Vérifie le fichier téléchargé avec `SHA256SUMS.txt` (publié avec chaque release).
 
-## Démarrage en 3 étapes
+## Démarrage
 
-1. **Ouvre T2C Phantom.** La connexion démarre toute seule (création de ton identité : quelques secondes la première fois).
-2. **Clique « Configurer automatiquement »** (une seule fois). Ton système peut demander ton mot de passe : l'application installe un certificat **limité aux sites `.t2c`** et règle le proxy pour que **seuls les `.t2c`** passent par T2C Phantom.
-3. **Ouvre `https://tutodecode.t2c`** dans Chrome, Edge, Safari, Firefox, Zen, Brave…
+1. **Ouvre T2C Phantom.** Un assistant te guide une seule fois : certificat limité aux `.t2c`, choix du navigateur (Firefox conseillé), proxy, puis connexion au réseau pair à pair.
+2. **Ouvre un site du carnet** d'un clic, ou tape son adresse `.t2c`.
+3. **Deviens bénévole si tu veux** : choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque.
 
 Tout le reste de ta navigation ne change pas. À la fermeture de l'application, tes réglages d'origine sont remis. Détails, ligne de commande et dépannage : **[Guide d'utilisation](docs/UTILISATION.md)**.
 
@@ -99,8 +99,10 @@ Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont con
 ## Roadmap
 
 - **v2.0** — pairs pseudonymes, bénévoles audités, sites signés, application multi-OS, configuration automatique des navigateurs.
-- **v2.1** — plusieurs relais (fin du point unique d'aiguillage), reprise des téléchargements.
-- **Ensuite** — applications signées (Apple / Windows), mises à jour automatiques.
+- **v2.1** — zéro confiance : clé racine hors ligne, serveur sans clé de publication, relais sans secret.
+- **v2.2** — assistant de premier lancement, carnet de sites, bénévolat choisi site par site avec copies chiffrées, liste de relais signée.
+- **Ensuite** — relais bénévoles (plusieurs points d'entrée), puis routage en oignon à travers eux pour l'anonymat complet.
+- **Plus tard** — applications signées (Apple / Windows), mises à jour automatiques.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 

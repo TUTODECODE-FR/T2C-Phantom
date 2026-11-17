@@ -24,22 +24,23 @@ Pour ne plus voir cette proposition : bouton « Ne plus demander » sur macOS, o
 
 ### Premier lancement
 
-1. La connexion démarre toute seule. L'écran indique **Connecté · identité pseudonyme** et ton identifiant de 32 caractères.
-2. Une fenêtre propose **Configurer automatiquement** : coche l'accord, puis valide.
-   - macOS demande ton mot de passe de session (ajout du certificat au trousseau).
-   - Windows affiche un avertissement de sécurité sur le certificat : clique **Oui**.
-3. Redémarre ton navigateur s'il était ouvert, puis ouvre **`https://tutodecode.t2c`**.
+Un assistant en 4 étapes s'affiche une seule fois :
 
-Si la CA est déjà installée, l'application ne te redemande rien.
+1. **Certificat** : installe le certificat local, limité aux adresses `.t2c` (impossible de s'en servir pour imiter un autre site). macOS demande ton mot de passe de session, Windows affiche un avertissement : accepte. S'il est déjà installé, l'étape est validée d'office.
+2. **Navigateur** : choisis le navigateur qui ouvrira les sites. **Firefox est conseillé** : il applique le certificat et le proxy sans aucun réglage.
+3. **Proxy** : seules les adresses `.t2c` passent par T2C Phantom ; tout le reste de ta navigation est inchangé. Si ton navigateur était ouvert, ferme-le et rouvre-le.
+4. **Réseau** : création de ton identité (une clé aléatoire, sans nom ni adresse) et connexion au réseau pair à pair.
+
+L'assistant peut être relancé à tout moment : **Réglages**, **Refaire l'assistant**.
 
 ### Au quotidien
 
-- **Laisse l'application ouverte** pendant que tu consultes des sites `.t2c`. À la fermeture, ton proxy d'origine est remis ; à la réouverture, tout se reconfigure automatiquement.
-- **Bénévole** (activé par défaut) : les sites que tu visites sont gardés et redistribués aux autres pairs. Pour le désactiver : **Déconnecter**, décoche « Bénévole (héberger une copie) », puis relance la connexion.
-- **Onglets** :
-  - *Testeur .t2c* : vérifie qu'un site répond ;
-  - *Réseau live* : ton identité, les sites hébergés, les bénévoles rencontrés et leur score, le catalogue signé ;
-  - *Association TUTODECODE* : informations légales.
+- **Carnet de sites** : la liste des sites du catalogue signé. **Ouvrir** lance le site dans ton navigateur, **Tester** vérifie qu'il répond (signature et contenu). Le champ du bas accepte n'importe quelle adresse `.t2c`.
+- **Bénévolat** (désactivé par défaut) : active-le, puis choisis les sites que tu acceptes d'héberger, ou « Tous les sites ». Tu fixes la place maximale et le débit d'envoi.
+  - Tes copies sont **chiffrées sur ton disque** et revérifiées à chaque envoi : une copie altérée n'est jamais servie, elle est supprimée puis retéléchargée.
+  - Quand TUTODECODE publie une nouvelle version d'un site, ta copie est mise à jour automatiquement et l'ancienne est supprimée.
+  - Les autres membres ne connaissent que ta clé pseudonyme.
+- **Laisse l'application ouverte** pendant que tu consultes des sites `.t2c`.
 
 ## Ligne de commande
 
@@ -83,7 +84,7 @@ Client minimal, sans proxy :
 
 On y trouve :
 - `peer/identity.json` : ton identité, **ne la partage pas** ;
-- `peer/hosted/` : les copies hébergées ;
+- `peer/hosted/` : les copies hébergées (chiffrées) et `peer/hosting.json`, tes choix de bénévole ;
 - `peer/sites/` : les sites vérifiés ;
 - `asso-ca/` : le certificat local `.t2c`.
 
