@@ -1,5 +1,7 @@
 # Guide d'utilisation
 
+> Version détaillée et à jour : [Guide complet](GUIDE.md).
+
 ## Application (recommandé)
 
 ### Installer
@@ -49,7 +51,7 @@ Pour un serveur, un Raspberry Pi ou sans interface graphique, télécharge l'arc
 ```bash
 ./t2c doctor          # diagnostic : clé racine, DNS du relais, port 8080, dossier de données
 ./t2c setup           # configure les navigateurs (une fois) — certificat .t2c + proxy PAC
-./t2c start           # client + proxy .t2c sur 127.0.0.1:8080, bénévole pour les sites visités
+./t2c start           # client + proxy .t2c sur 127.0.0.1:8080 (bénévole seulement avec -host)
 ./t2c unsetup         # remet les réglages proxy d'origine
 ./t2c id              # affiche ton identité pseudonyme
 ./t2c dashboard       # tableau de bord dans le navigateur (http://127.0.0.1:9090)
@@ -60,7 +62,7 @@ Options de `t2c start` :
 | Option | Rôle |
 |---|---|
 | `-proxy 8080` | port du proxy local (`0` = désactivé) |
-| `-no-volunteer` | ne pas héberger de copie |
+| `-no-volunteer` | n'héberger aucune copie |
 | `-host site1,site2` | héberger ces sites dès le démarrage |
 | `-relay wss://…` | autre relais (variable `T2C_RELAY_URL`) |
 | `-carnet fichier.json` | alias locaux (`{"cours.t2c": "tutodecode"}`) |
@@ -94,11 +96,11 @@ La variable `T2C_DATA_DIR` permet de changer ce dossier.
 
 | Symptôme | Solution |
 |---|---|
-| « relais injoignable » | vérifie ta connexion Internet ; `t2c doctor` teste la résolution DNS du relais |
-| le navigateur affiche « non sécurisé » sur un `.t2c` | relance **Configurer automatiquement**, puis redémarre complètement le navigateur |
+| « relais injoignable » | vérifie ta connexion Internet ; l'application essaie tour à tour tous les relais connus ; `t2c doctor` pour un diagnostic |
+| le navigateur affiche « non sécurisé » sur un `.t2c` | **Réglages** → **Refaire l'assistant**, puis redémarre complètement le navigateur |
 | `xxx.t2c n'est pas dans le catalogue signé` | ce site n'existe pas (ou plus) : seul le catalogue officiel est servi |
 | un site non `.t2c` ne charge plus | quitte et relance l'application (le PAC est remis) ; en dernier recours `t2c unsetup` |
-| Linux : « installation automatique impossible » | `sudo apt install libnss3-tools` (ou `nss-tools`), puis relance la configuration |
+| Linux : « installation automatique impossible » | `sudo apt install libnss3-tools` (ou `nss-tools`), puis **Refaire l'assistant** |
 | port 8080 déjà utilisé | `T2C_PROXY_PORT=8081` avant de lancer l'application (ou `t2c start -proxy 8081`) |
 
 ## Désinstaller

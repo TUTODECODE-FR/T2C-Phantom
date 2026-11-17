@@ -51,7 +51,7 @@ Vérifie le fichier téléchargé avec `SHA256SUMS.txt` (publié avec chaque rel
 2. **Ouvre un site du carnet** d'un clic, ou tape son adresse `.t2c`.
 3. **Deviens bénévole si tu veux** : choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque.
 
-Tout le reste de ta navigation ne change pas. À la fermeture de l'application, tes réglages d'origine sont remis. Détails, ligne de commande et dépannage : **[Guide d'utilisation](docs/UTILISATION.md)**.
+Tout le reste de ta navigation ne change pas. À la fermeture de l'application, tes réglages d'origine sont remis. Tout savoir (utilisation, bénévolat, fonctionnement, sécurité, dépannage) : **[Guide complet](docs/GUIDE.md)**.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 

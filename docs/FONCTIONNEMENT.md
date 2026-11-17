@@ -1,5 +1,7 @@
 # Comment fonctionne T2C Phantom
 
+> Version détaillée et à jour : [Guide complet](GUIDE.md).
+
 ## En une image
 
 ```mermaid
@@ -81,16 +83,17 @@ Les échanges entre deux pairs utilisent le protocole **Noise IK** (X25519, ChaC
 
 | | Ton IP | Ta clé | Sites que tu demandes | Contenu échangé entre pairs |
 |---|---|---|---|---|
-| **Cloudflare** | oui | oui | oui | non (chiffré) |
-| **Relais** | non | oui | oui | non (chiffré) |
+| **Cloudflare** | oui | oui | mode normal : oui ; mode anonyme : non | non (chiffré) |
+| **Relais d'entrée** | non | oui | mode normal : oui ; mode anonyme : non | non (chiffré) |
+| **Relais de sortie** (mode anonyme) | non | non (pseudonyme jetable) | oui | non (chiffré) |
 | **Origine** | non | seulement si tu es bénévole | non | — |
-| **Autres pairs** | non | oui | seulement ce qu'ils te fournissent | — |
+| **Autres pairs** | non | mode normal : oui ; anonyme : pseudonyme jetable | seulement ce qu'ils te fournissent | — |
 
-Le relais ne lit aucun en-tête contenant une adresse IP, et l'origine refuse toute requête qui en porterait une. Les métadonnées (qui demande quel site, quelles clés échangent entre elles) restent visibles par Cloudflare et par le relais : c'est un choix assumé. L'objectif est de **protéger les adresses IP**, pas de rendre la navigation intraçable comme Tor.
+Le relais ne lit aucun en-tête contenant une adresse IP, et l'origine refuse toute requête qui en porterait une. Tant que le nom de domaine n'est pas actif, le relais principal sert lui-même de point d'entrée et voit donc les adresses IP à la place de Cloudflare.
 
 ## Configuration des navigateurs
 
-Quand tu cliques sur « Configurer automatiquement » :
+Pendant l'assistant du premier lancement (étapes Certificat et Proxy) :
 
 | Système | Certificat `.t2c` | Proxy (PAC) |
 |---|---|---|
@@ -102,7 +105,7 @@ Firefox, Zen et LibreWolf sont réglés pour lire les certificats du système (`
 
 ## Limites connues
 
-- **Tout passe par le relais** : les pairs ne se connectent jamais directement, sinon ils verraient leurs IP. La bande passante du relais est donc la limite. Plusieurs relais sont prévus (v2.1).
-- **Cloudflare** voit ton IP et les sites demandés.
+- **Tout passe par les relais** : les pairs ne se connectent jamais directement, sinon ils verraient leurs IP. La bande passante des relais est donc la limite ; la fédération permet d'en ajouter.
+- **Cloudflare** voit ton IP (et, hors mode anonyme, les sites demandés).
 - **Applications non signées** par Apple et Microsoft : un avertissement s'affiche au premier lancement.
 - Un **poste compromis** (logiciel malveillant) est hors de portée de toute protection réseau.
