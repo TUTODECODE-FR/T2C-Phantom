@@ -34,6 +34,12 @@ const (
 	TReport                    // pair → VPS : morceau faux reçu de Peer
 	TVolunteer                 // pair → VPS : demande de ticket pour Site
 	TTicket                    // VPS → pair : ticket signé par l'origine
+
+	// Fédération : trames échangées uniquement entre relais (jamais avec un pair).
+	TMeshHello   // poignée de main mutuelle (clé de relais + signature du nonce)
+	TMeshIndex   // annuaire des bénévoles du relais (remplace le précédent)
+	TMeshRPC     // appel à l'origine pour le compte d'un relais sans accès direct
+	TMeshRPCResp // réponse à TMeshRPC
 )
 
 const (
@@ -41,6 +47,12 @@ const (
 	MaxPayload = trust.ChunkSize + 4096
 	MaxMessage = 3 + MaxHeader + MaxPayload
 )
+
+// MeshSubprotocol : liaison entre relais (point d'entrée /v1/mesh).
+const MeshSubprotocol = "t2c.mesh.v1"
+
+// MeshPayload : ce qu'un relais signe pour prouver sa clé à un autre relais.
+func MeshPayload(nonce []byte) []byte { return append([]byte("t2c/mesh/v1\n"), nonce...) }
 
 // Subprotocol : sous-protocole WebSocket exigé par le relais. Toute connexion
 // qui ne l'annonce pas est refusée avant même l'ouverture de la WebSocket.
@@ -124,7 +136,7 @@ func Decode(b []byte) (*Frame, error) {
 		return nil, errors.New("wire: longueurs invalides")
 	}
 	f := &Frame{T: Type(b[0])}
-	if f.T < TChallenge || f.T > TTicket {
+	if f.T < TChallenge || f.T > TMeshRPCResp {
 		return nil, fmt.Errorf("wire: type inconnu %d", b[0])
 	}
 	if err := json.Unmarshal(b[3:3+hl], &f.H); err != nil {
