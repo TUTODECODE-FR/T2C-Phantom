@@ -83,6 +83,7 @@ func (s *Server) handleConnectHTTPS(w http.ResponseWriter, req *http.Request) {
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      10 * time.Minute,
+		MaxHeaderBytes:    32 << 10,
 		ErrorLog:          nil,
 	}
 	if err := srv.Serve(ln); err != nil && err != net.ErrClosed && err != http.ErrServerClosed {

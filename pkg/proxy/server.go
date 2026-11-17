@@ -52,6 +52,7 @@ func StartProxyServer(n Sites, listenAddr string) error {
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      10 * time.Minute, // premier téléchargement d'un site
 		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    32 << 10,
 	}
 	fmt.Printf("Proxy T2C sur http://%s\n", listenAddr)
 	return srv.ListenAndServe()
