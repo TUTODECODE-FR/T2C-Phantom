@@ -15,6 +15,7 @@ Objectif assumé : **protéger l'adresse IP** des utilisateurs et des bénévole
 | Le serveur d'origine est piraté | La clé racine n'y est pas : elle reste hors ligne chez l'éditeur. Le serveur n'a qu'une clé de service déléguée (180 jours au plus) qui ne peut signer que les tickets et la liste des bénévoles, jamais un site ni le catalogue |
 | Le relais (VPS) est piraté | Il ne détient aucun secret de l'origine : chaque requête vers l'origine est signée par sa propre clé, horodatée et non rejouable. Il ne peut ni falsifier un site ni joindre le réseau de l'origine |
 | Un relais relie ton IP à ce que tu consultes | Mode anonyme : circuit en oignon à travers 2 ou 3 relais ; l'entrée connaît l'IP sans lire les demandes, la sortie lit les demandes sans connaître ni l'IP ni l'identité (pseudonyme jetable, renouvelé toutes les 10 minutes) |
+| Un observateur déduit l'activité de la taille ou du rythme du trafic | Cellules de 4 tailles fixes (remplissage aléatoire), cellules leurres en continu, délai aléatoire au relais de sortie |
 | Requêtes forgées ou non conformes sur le relais | Seule une ouverture WebSocket annonçant le sous-protocole `t2c.v2` est acceptée (sinon 404 muet) ; identification exigée en quelques secondes, refus générique, messages hors protocole sanctionnés puis bannissement |
 | Flood ou création massive d'identités | Cloudflare devant le relais, limites par clé, preuve de travail pour créer une identité |
 | Le certificat local est volé | Il est limité aux noms `.t2c` (Name Constraints) : il ne permet d'imiter aucun autre site |

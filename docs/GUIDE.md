@@ -191,6 +191,10 @@ Dès que la liste signée compte au moins deux relais, l'application passe **d'e
 - Le **relais de sortie** lit les demandes (quel site, quels morceaux), mais ne connaît ni ton IP ni ton identité : seulement un **pseudonyme jetable**, renouvelé toutes les 10 minutes.
 - Les **bénévoles** ne voient que ce pseudonyme.
 - **Échec fermé** : si le circuit tombe, rien n'est envoyé en clair à sa place ; l'application en reconstruit un.
+- **Contre l'analyse de trafic** :
+  - **tailles fixes** : chaque cellule est complétée (remplissage aléatoire) jusqu'à l'une de 4 tailles (1 Ko, 8 Ko, 65 Ko, 260 Ko) ; une recherche, une demande de catalogue et une cellule leurre sont indiscernables ;
+  - **trafic leurre** : l'application envoie de fausses cellules toutes les 2 à 8 secondes, et le relais de sortie y répond parfois par de fausses réponses ; le rythme du trafic ne trahit plus l'activité réelle ;
+  - **délais aléatoires** : le relais de sortie attend 10 à 80 ms avant de traiter une petite demande (au plus 10 à 15 ms pour les morceaux de site), ce qui casse la corrélation des temps entre l'entrée et la sortie du circuit.
 
 Si quelqu'un interroge un relais ou un bénévole sur « qui a demandé quoi », il ne peut pas répondre : il ne possède pas l'information.
 
@@ -236,7 +240,7 @@ Précisions :
 | Application de bureau | Wails (interface web intégrée, sans ressource distante) |
 | Identité et signatures | Ed25519, preuve de travail de 22 bits |
 | Chiffrement de bout en bout entre membres | Noise IK (X25519, ChaCha20-Poly1305, BLAKE2s) |
-| Circuits anonymes | échange X25519 authentifié à clés éphémères, couches AES-256-GCM |
+| Circuits anonymes | échange X25519 authentifié à clés éphémères, couches AES-256-GCM, cellules de taille fixe, trafic leurre, délais aléatoires |
 | Intégrité | SHA-256 par morceau de 256 Ko, manifestes et catalogue signés |
 | Copies des bénévoles | AES-256-GCM sur le disque, revérifiées à chaque lecture |
 | Transport | WebSocket sur TLS 1.2/1.3, sous-protocole `t2c.v2` obligatoire |
@@ -324,7 +328,7 @@ La variable `T2C_DATA_DIR` permet de changer ce dossier.
 ## 14. Limites connues
 
 - **Le point d'entrée voit ton IP.** Toute connexion révèle l'adresse de celui qui l'ouvre ; c'est Cloudflare (ou le relais principal tant que le domaine n'est pas actif). Si même lui ne doit pas la connaître, utilise un VPN ou Tor avant T2C Phantom.
-- **L'anonymat suppose des relais indépendants.** Il repose sur le fait que les relais d'un circuit ne s'entendent pas entre eux, comme pour Tor. Des relais tenus par un même opérateur ne protègent pas contre cet opérateur.
+- **L'anonymat suppose des relais indépendants.** Il repose sur le fait que les relais d'un circuit ne s'entendent pas entre eux, comme pour Tor. Des relais tenus par un même opérateur ne protègent pas contre cet opérateur. Les tailles fixes, le trafic leurre et les délais rendent la corrélation bien plus difficile, sans la rendre impossible pour un adversaire qui observe à la fois l'entrée et la sortie.
 - **Le bénévolat n'est pas anonyme vis-à-vis de son relais**, qui sait quels sites tu héberges.
 - **La bande passante des relais** est la limite du réseau : tout le trafic entre membres passe par eux.
 - **Applications non signées** par Apple et Microsoft : un avertissement s'affiche au premier lancement.

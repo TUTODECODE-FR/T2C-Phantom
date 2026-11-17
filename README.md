@@ -26,7 +26,7 @@ T2C Phantom te permet d'ouvrir les sites **`.t2c`** de TUTODECODE (par exemple `
 - **Pseudonyme** — tu n'es qu'une clé générée au hasard sur ta machine. Pas de compte, pas d'email.
 - **Ton IP reste cachée** — seul le point d'entrée (Cloudflare) la voit ; les relais, le serveur et les autres pairs ne voient que ta clé.
 - **Sites authentiques** — chaque site est signé par TUTODECODE et vérifié morceau par morceau : personne ne peut en modifier un octet en route.
-- **Mode anonyme** — dès que le réseau compte plusieurs relais, tes demandes traversent un circuit chiffré en couches : aucun relais ne relie ton IP à ce que tu consultes.
+- **Mode anonyme** — dès que le réseau compte plusieurs relais, tes demandes traversent un circuit chiffré en couches : aucun relais ne relie ton IP à ce que tu consultes. Cellules de taille fixe, trafic leurre et délais aléatoires brouillent aussi l'analyse du trafic.
 - **Bénévole en option** — tu choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque et contrôlées régulièrement.
 
 Voir aussi : [Guide complet](docs/GUIDE.md) · [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
@@ -69,6 +69,8 @@ Mode anonyme (au moins deux relais)
       ──▶ relais d'entrée (voit : clé ; pas le site, cellules chiffrées)
       ──▶ [relais intermédiaire] ──▶ relais de sortie (voit : site ; ni IP ni clé, pseudonyme jetable)
       ──chiffré de bout en bout──▶ bénévole (voit : pseudonyme jetable)
+  Dans le circuit : cellules de 4 tailles fixes seulement, cellules leurres en continu,
+  délai aléatoire à la sortie → ni la taille ni le rythme ne trahissent l'activité.
 
 À chaque étape : chaque morceau reçu est vérifié contre l'empreinte signée par TUTODECODE.
 ```
@@ -124,6 +126,8 @@ wails build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY"           # applicati
 - **Ce qu'il ne peut pas faire** : lire les échanges entre membres (chiffrés de bout en bout) ni modifier un site (signatures vérifiées par ton client).
 - **Si même lui ne doit pas connaître ton IP** : passe par un VPN ou Tor avant T2C Phantom. La fédération permet aussi d'ajouter des relais d'entrée qui ne dépendent pas de Cloudflare.
 
+**Un observateur peut-il deviner mon activité en regardant le trafic ?** C'est beaucoup plus difficile en mode anonyme : toutes les cellules ont l'une de 4 tailles fixes (remplissage aléatoire), des cellules leurres circulent en permanence, et le relais de sortie ajoute un délai aléatoire. Ni la taille, ni le rythme, ni le moment ne permettent facilement de relier une entrée à une sortie. Comme pour Tor, un adversaire qui contrôle à la fois l'entrée et la sortie d'un circuit garde des moyens de corrélation : la diversité des opérateurs de relais reste la meilleure protection.
+
 T2C Phantom n'est pas un outil d'anonymat absolu comme Tor : son objectif est de **protéger ton adresse IP** et de **garantir l'authenticité des sites**, avec un mode anonyme qui coupe le lien entre ton adresse et ce que tu consultes.
 
 **Un bénévole peut-il me servir un site piégé ?** Non : chaque morceau est comparé à l'empreinte signée par TUTODECODE ; un morceau modifié est rejeté, le bénévole est banni et signalé.
@@ -140,7 +144,7 @@ T2C Phantom n'est pas un outil d'anonymat absolu comme Tor : son objectif est de
 - **v2.1** — zéro confiance : clé racine hors ligne, serveur sans clé de publication, relais sans secret.
 - **v2.2** — assistant de premier lancement, carnet de sites, bénévolat choisi site par site avec copies chiffrées, liste de relais signée.
 - **v2.3** — fédération de relais : plusieurs points d'entrée reliés entre eux.
-- **v2.4** — mode anonyme : routage en oignon à travers les relais, pseudonyme jetable, échec fermé.
+- **v2.4** — mode anonyme : routage en oignon à travers les relais, pseudonyme jetable, échec fermé ; relais cachés (aucune écoute sur Internet) ; protection contre l'analyse de trafic (cellules de taille fixe, trafic leurre, délais aléatoires) ; correctifs issus d'un pentest.
 - **Plus tard** — applications signées (Apple / Windows), mises à jour automatiques.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
