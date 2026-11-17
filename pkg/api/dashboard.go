@@ -97,11 +97,18 @@ func (d *Dashboard) Start(port int) error {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	fmt.Printf("\n=== T2C Dashboard ===\nInterface : http://%s\n=====================\n\n", addr)
 
-	// anti DNS-rebinding : seul l'hôte local exact est accepté
+	// anti DNS-rebinding : seul l'hôte local exact est accepté.
+	// anti CSRF : une page web ouverte dans le navigateur ne doit pas pouvoir
+	// piloter l'app (POST/DELETE depuis une autre origine refusés).
+	local := map[string]bool{"http://" + addr: true, fmt.Sprintf("http://localhost:%d", port): true}
 	guard := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Host != addr && r.Host != fmt.Sprintf("localhost:%d", port) {
 				http.Error(w, "Forbidden: Invalid Host", http.StatusForbidden)
+				return
+			}
+			if !crossSiteSafe(r, local) {
+				http.Error(w, "Forbidden: cross-site", http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -532,4 +539,19 @@ func LoadCarnet(path string) map[string]string {
 		_ = json.Unmarshal(b, &m)
 	}
 	return m
+}
+
+// crossSiteSafe : lectures toujours permises ; toute action (POST, DELETE…)
+// doit venir de l'interface elle-même, jamais d'un autre site.
+func crossSiteSafe(r *http.Request, local map[string]bool) bool {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		return true
+	}
+	if s := r.Header.Get("Sec-Fetch-Site"); s == "cross-site" || s == "same-site" {
+		return false
+	}
+	if o := r.Header.Get("Origin"); o != "" && !local[o] {
+		return false
+	}
+	return true
 }
