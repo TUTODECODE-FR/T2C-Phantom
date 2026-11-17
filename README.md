@@ -24,11 +24,12 @@
 T2C Phantom te permet d'ouvrir les sites **`.t2c`** de TUTODECODE (par exemple `https://tutodecode.t2c`) dans ton navigateur habituel. Ces sites ne sont pas servis par un seul serveur : ils sont **copiés et redistribués par des bénévoles**, comme toi, pendant que l'application tourne.
 
 - **Pseudonyme** — tu n'es qu'une clé générée au hasard sur ta machine. Pas de compte, pas d'email.
-- **Ton IP reste cachée** — seul Cloudflare (le point d'entrée) la voit ; le relais, le serveur et les autres pairs ne voient que ta clé.
+- **Ton IP reste cachée** — seul le point d'entrée (Cloudflare) la voit ; les relais, le serveur et les autres pairs ne voient que ta clé.
 - **Sites authentiques** — chaque site est signé par TUTODECODE et vérifié morceau par morceau : personne ne peut en modifier un octet en route.
-- **Bénévole en option** — tu peux héberger une copie des sites que tu visites pour aider le réseau ; ta copie est contrôlée régulièrement.
+- **Mode anonyme** — dès que le réseau compte plusieurs relais, tes demandes traversent un circuit chiffré en couches : aucun relais ne relie ton IP à ce que tu consultes.
+- **Bénévole en option** — tu choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque et contrôlées régulièrement.
 
-Voir aussi : [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
+Voir aussi : [Guide complet](docs/GUIDE.md) · [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -53,6 +54,25 @@ Vérifie le fichier téléchargé avec `SHA256SUMS.txt` (publié avec chaque rel
 
 Tout le reste de ta navigation ne change pas. À la fermeture de l'application, tes réglages d'origine sont remis. Tout savoir (utilisation, bénévolat, fonctionnement, sécurité, dépannage) : **[Guide complet](docs/GUIDE.md)**.
 
+## Trajet d'une requête
+
+```
+Mode normal
+  Navigateur ──PAC (.t2c seulement)──▶ proxy local 127.0.0.1 + certificat local .t2c
+      ──TLS──▶ Cloudflare (voit : IP, clé, site demandé)
+      ──▶ relais (voit : clé, site demandé ; jamais l'IP)
+      ──chiffré de bout en bout (Noise)──▶ bénévole (voit : clé)
+      └─ repli : serveur d'origine, joint uniquement par le relais (réseau privé)
+
+Mode anonyme (au moins deux relais)
+  Navigateur ──▶ proxy local ──TLS──▶ Cloudflare (voit : IP, clé ; pas le site)
+      ──▶ relais d'entrée (voit : clé ; pas le site, cellules chiffrées)
+      ──▶ [relais intermédiaire] ──▶ relais de sortie (voit : site ; ni IP ni clé, pseudonyme jetable)
+      ──chiffré de bout en bout──▶ bénévole (voit : pseudonyme jetable)
+
+À chaque étape : chaque morceau reçu est vérifié contre l'empreinte signée par TUTODECODE.
+```
+
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
 ## Licence
@@ -68,17 +88,27 @@ Tout ce qui tourne sur ta machine est public et vérifiable : c'est là que se j
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
-## Compiler depuis les sources
+## Démarrage rapide (développeurs)
+
+Prérequis : Go (version indiquée dans `go.mod`) ; pour l'application, [Wails v2](https://wails.io) et, sous Linux, `libgtk-3-dev libwebkit2gtk-4.1-dev`.
 
 ```bash
 git clone https://github.com/TUTODECODE-FR/T2C-Phantom.git && cd T2C-Phantom
-# clé publique racine du réseau TUTODECODE
-KEY=985c6d08ed885e08d69611f861595b7d4d6ae7a11a0cfc4c6a7f8267fa2d984f
-go build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY" -o t2c ./cmd/t2c           # ligne de commande
-cd desktop && wails build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY"           # application (Wails v2)
+go test ./...                                   # tests du client (protocole, signatures, circuits, stockage)
+
+KEY=985c6d08ed885e08d69611f861595b7d4d6ae7a11a0cfc4c6a7f8267fa2d984f   # clé publique racine de TUTODECODE
+go build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY" -o t2c ./cmd/t2c
+go build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY" -o t2c-peer ./cmd/t2c-peer
+
+./t2c-peer list                                 # catalogue signé et bénévoles en ligne
+T2C_NO_BROWSER_SETUP=1 T2C_DATA_DIR=./donnees-test ./t2c start -proxy 18080 -no-volunteer   # client isolé
+curl -x http://127.0.0.1:18080 http://tutodecode.t2c/                # un site .t2c via le proxy local
+
+cd desktop && wails dev                         # application en mode développement
+wails build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY"           # application finale
 ```
 
-Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont construites par GitHub Actions ([release.yml](.github/workflows/release.yml)) et recopiées sur GitLab.
+`T2C_NO_BROWSER_SETUP=1` empêche toute modification des réglages de ton système et de tes navigateurs ; `T2C_DATA_DIR` isole l'identité et les données de test. Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont construites par GitHub Actions ([release.yml](.github/workflows/release.yml)) puis recopiées sur GitLab, fichiers et sommes de contrôle vérifiés avant la copie.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -86,7 +116,15 @@ Organisation du code : [ARCHITECTURE.md](ARCHITECTURE.md). Les releases sont con
 
 **Est-ce un VPN ou Tor ?** Non. T2C Phantom ne touche qu'aux sites `.t2c`. Pour le reste de ta navigation, rien ne change.
 
-**Qui voit quoi ?** Cloudflare voit ton IP et les sites `.t2c` que tu demandes ; le relais voit ta clé pseudonyme et avec quelles clés tu échanges, jamais ton IP ; les bénévoles ne voient que ta clé. Le contenu échangé entre pairs est chiffré de bout en bout. Détails : [Comment ça marche](docs/FONCTIONNEMENT.md#qui-voit-quoi).
+**Qui voit quoi ?** Cloudflare voit ton IP (et, hors mode anonyme, les sites `.t2c` demandés) ; les relais voient ta clé pseudonyme, jamais ton IP ; en mode anonyme, aucun relais ne voit à la fois ta clé et ce que tu consultes. Le contenu échangé entre pairs est chiffré de bout en bout. Détails : [Guide complet](docs/GUIDE.md#8-qui-voit-quoi).
+
+**Pourquoi passer par Cloudflare, un acteur centralisé ?** Choix pragmatique, assumé et limité :
+- **Ce qu'il apporte** : il cache l'adresse du relais (personne ne peut l'attaquer directement) et absorbe les attaques par saturation, ce qu'un petit relais associatif ne peut pas faire seul.
+- **Ce qu'il voit** : ton IP, comme tout point d'entrée (une connexion révèle toujours l'adresse de celui qui l'ouvre). En mode anonyme, il ne voit plus les sites demandés : seulement des cellules chiffrées.
+- **Ce qu'il ne peut pas faire** : lire les échanges entre membres (chiffrés de bout en bout) ni modifier un site (signatures vérifiées par ton client).
+- **Si même lui ne doit pas connaître ton IP** : passe par un VPN ou Tor avant T2C Phantom. La fédération permet aussi d'ajouter des relais d'entrée qui ne dépendent pas de Cloudflare.
+
+T2C Phantom n'est pas un outil d'anonymat absolu comme Tor : son objectif est de **protéger ton adresse IP** et de **garantir l'authenticité des sites**, avec un mode anonyme qui coupe le lien entre ton adresse et ce que tu consultes.
 
 **Un bénévole peut-il me servir un site piégé ?** Non : chaque morceau est comparé à l'empreinte signée par TUTODECODE ; un morceau modifié est rejeté, le bénévole est banni et signalé.
 
