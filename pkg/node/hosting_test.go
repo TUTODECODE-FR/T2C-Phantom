@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,22 @@ func TestRelayCandidates(t *testing.T) {
 	n.cfg.RelayURL = "wss://perso.example/v1/ws"
 	if c := n.relayCandidates(); c[0] != "wss://perso.example/v1/ws" {
 		t.Fatalf("relais choisi pas en premier: %v", c)
+	}
+}
+
+func TestHiddenRelayNeverDialed(t *testing.T) {
+	dir := t.TempDir()
+	n := &Node{cfg: Config{DataDir: dir}}
+	key := "985c6d08ed885e08d69611f861595b7d4d6ae7a11a0cfc4c6a7f8267fa2d984f"
+	learned := []string{"wss://vps.example/v1/ws#k=" + key, "hidden:maison#k=" + key[:62] + "aa"}
+	b, _ := json.Marshal(learned)
+	_ = os.WriteFile(filepath.Join(dir, "relays.json"), b, 0o600)
+	for _, u := range n.relayCandidates() {
+		if strings.HasPrefix(u, "hidden:") {
+			t.Fatal("relais caché proposé à la connexion")
+		}
+	}
+	if keys := n.relayKeys(); len(keys) != 2 {
+		t.Fatalf("le relais caché doit servir aux circuits: %d clés", len(keys))
 	}
 }

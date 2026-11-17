@@ -277,7 +277,10 @@ func (n *Node) learnRelays(ctx context.Context, c *peerclient.Client) bool {
 	}
 	var urls []string
 	for _, u := range hl.Bootstrap { // « url#k=clé » : la clé sert aux circuits anonymes
-		if validRelay(u) && len(urls) < 16 && !slices.Contains(urls, u) {
+		base, _, _ := strings.Cut(u, "#")
+		// relais caché (« hidden:nom#k=clé ») : jamais contacté, seulement utilisé dans les circuits
+		usable := validRelay(base) || (strings.HasPrefix(base, "hidden:") && strings.Contains(u, "#k="))
+		if usable && len(urls) < 16 && !slices.Contains(urls, u) {
 			urls = append(urls, u)
 		}
 	}
