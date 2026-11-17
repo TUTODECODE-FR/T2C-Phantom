@@ -33,6 +33,14 @@ type Options struct {
 	Header  http.Header         // headers de la requête WebSocket (tests : simuler Cloudflare)
 	// UploadBytesPerSec : débit maximal envoyé aux autres pairs (0 = illimité).
 	UploadBytesPerSec int64
+	// Anonymous : demandes par circuit en oignon (EntryKey = clé du relais
+	// auquel on se connecte, Relays = relais de la liste signée).
+	Anonymous bool
+	EntryKey  ed25519.PublicKey
+	Relays    []RelayKey
+	// OnServe (bénévole) : appelé avec l'identité présentée par chaque demandeur
+	// servi (vérification de l'anonymat, statistiques). Facultatif.
+	OnServe func(from string)
 }
 
 type Client struct {
@@ -52,6 +60,8 @@ type Client struct {
 	serveSem chan struct{}
 	upload   *rateLimiter
 	served   atomic.Int64 // octets servis à d'autres pairs
+	circ     *circuit     // circuit en oignon actif (mode anonyme)
+	building map[uint64]*circuit
 }
 
 type outSession struct {
@@ -86,7 +96,7 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 		id: id, opt: opt, conn: wire.NewConn(ws), rep: NewReputation(),
 		pending: map[uint64]chan *wire.Frame{}, outs: map[uint64]*outSession{},
 		tickets: map[string]trust.Ticket{}, done: make(chan struct{}), serveSem: make(chan struct{}, 8),
-		upload: newRateLimiter(opt.UploadBytesPerSec),
+		upload: newRateLimiter(opt.UploadBytesPerSec), building: map[uint64]*circuit{},
 	}
 	c.guard = opt.Guard
 	if c.guard == nil {
@@ -97,6 +107,16 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 		return nil, err
 	}
 	go c.readLoop()
+	if opt.Anonymous {
+		// échec fermé : sans circuit, pas de connexion utilisable en mode anonyme
+		ci, err := c.buildCircuit(ctx)
+		if err != nil {
+			_ = c.Close()
+			return nil, err
+		}
+		c.installCircuit(ci)
+		go c.circuitLoop()
+	}
 	return c, nil
 }
 
@@ -160,22 +180,35 @@ func (c *Client) readLoop() {
 	for {
 		f, err := c.conn.Recv()
 		if err != nil {
+			if ci := c.currentCircuit(); ci != nil {
+				ci.kill()
+			}
 			return
 		}
 		switch f.T {
-		case wire.TFwd:
-			c.onFwd(f)
+		case wire.TCircCreated, wire.TCircCell, wire.TCircDestroy:
+			c.onCircuitFrame(f)
 		case wire.TAudit:
 			go c.onAudit(f)
-		case wire.TError:
-			if f.H.SID != 0 {
-				c.failOut(f.H.SID, errors.New(f.H.Err))
-				continue
-			}
-			c.deliver(f)
 		default:
-			c.deliver(f)
+			c.handle(f)
 		}
+	}
+}
+
+// handle : trame reçue directement ou extraite d'un circuit.
+func (c *Client) handle(f *wire.Frame) {
+	switch f.T {
+	case wire.TFwd:
+		c.onFwd(f)
+	case wire.TError:
+		if f.H.SID != 0 {
+			c.failOut(f.H.SID, errors.New(f.H.Err))
+			return
+		}
+		c.deliver(f)
+	default:
+		c.deliver(f)
 	}
 }
 
@@ -207,7 +240,11 @@ func (c *Client) request(ctx context.Context, f *wire.Frame) (*wire.Frame, error
 		c.mu.Unlock()
 	}()
 	f.H.Q = q
-	if err := c.conn.Send(f); err != nil {
+	send := c.conn.Send
+	if f.T == wire.TFind || f.T == wire.TGet {
+		send = c.sendData // demandes de consultation : par le circuit en mode anonyme
+	}
+	if err := send(f); err != nil {
 		return nil, err
 	}
 	select {
@@ -307,6 +344,9 @@ func (c *Client) Find(ctx context.Context, root string) ([]wire.HostInfo, error)
 
 // Report : signale au VPS un morceau faux reçu d'un pair (il sera audité).
 func (c *Client) Report(peer, root string, i int) {
+	if c.opt.Anonymous {
+		return // signaler révélerait ce qu'on consulte ; le bannissement local suffit
+	}
 	_ = c.conn.Send(&wire.Frame{T: wire.TReport, H: wire.Header{Peer: peer, Root: root, Index: i}})
 }
 
@@ -320,7 +360,11 @@ type chunkReq struct {
 // FetchFromPeer : demande le morceau i à un bénévole (Noise IK via le VPS).
 // Le résultat n'est PAS vérifié ici : l'appelant le compare au manifeste.
 func (c *Client) FetchFromPeer(ctx context.Context, h wire.HostInfo, root string, i int) ([]byte, error) {
-	hs, err := newInitiator(c.id, h.Peer, h.NoisePub)
+	me, err := c.e2eIdentity()
+	if err != nil {
+		return nil, err
+	}
+	hs, err := newInitiator(me, h.Peer, h.NoisePub)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +385,7 @@ func (c *Client) FetchFromPeer(ctx context.Context, h wire.HostInfo, root string
 		delete(c.outs, sid)
 		c.mu.Unlock()
 	}()
-	if err := c.conn.Send(&wire.Frame{T: wire.TFwd, H: wire.Header{To: h.Peer, SID: sid}, Data: msg1}); err != nil {
+	if err := c.sendData(&wire.Frame{T: wire.TFwd, H: wire.Header{To: h.Peer, SID: sid}, Data: msg1}); err != nil {
 		return nil, err
 	}
 	select {
@@ -423,6 +467,9 @@ func (c *Client) serve(from string, sid uint64, msg1 []byte) {
 	payload, _, _, err := hs.ReadMessage(nil, msg1)
 	if err != nil {
 		return // message non déchiffrable : on ignore
+	}
+	if c.opt.OnServe != nil {
+		c.opt.OnServe(from)
 	}
 	var req chunkReq
 	resp := encodeResponse(stErr, []byte("requête invalide"))
