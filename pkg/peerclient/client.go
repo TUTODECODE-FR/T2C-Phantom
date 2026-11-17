@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,18 +51,19 @@ type Client struct {
 	rep   *Reputation
 	guard *trust.VersionGuard
 
-	mu       sync.Mutex
-	nextQ    uint64
-	pending  map[uint64]chan *wire.Frame
-	outs     map[uint64]*outSession
-	tickets  map[string]trust.Ticket // racine → ticket
-	closed   bool
-	done     chan struct{}
-	serveSem chan struct{}
-	upload   *rateLimiter
-	served   atomic.Int64 // octets servis à d'autres pairs
-	circ     *circuit     // circuit en oignon actif (mode anonyme)
-	building map[uint64]*circuit
+	mu        sync.Mutex
+	nextQ     uint64
+	pending   map[uint64]chan *wire.Frame
+	outs      map[uint64]*outSession
+	tickets   map[string]trust.Ticket // racine → ticket
+	closed    bool
+	done      chan struct{}
+	serveSem  chan struct{}
+	upload    *rateLimiter
+	served    atomic.Int64 // octets servis à d'autres pairs
+	circ      *circuit     // circuit en oignon actif (mode anonyme)
+	originSem chan struct{}
+	building  map[uint64]*circuit
 }
 
 type outSession struct {
@@ -97,6 +99,7 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 		pending: map[uint64]chan *wire.Frame{}, outs: map[uint64]*outSession{},
 		tickets: map[string]trust.Ticket{}, done: make(chan struct{}), serveSem: make(chan struct{}, 8),
 		upload: newRateLimiter(opt.UploadBytesPerSec), building: map[uint64]*circuit{},
+		originSem: make(chan struct{}, originSlots),
 	}
 	c.guard = opt.Guard
 	if c.guard == nil {
@@ -322,8 +325,32 @@ func (c *Client) Manifest(ctx context.Context, root string) (*trust.Manifest, er
 }
 
 // OriginChunk : morceau via VPS → origine (repli quand aucun bénévole ne l'a).
+// originSlots : demandes simultanées à l'origine par connexion (le relais en
+// accepte 4 ; au-delà il répond « trop de requêtes simultanées »).
+const originSlots = 3
+
+// OriginChunk : morceau servi par l'origine (via le relais). Si le relais est
+// momentanément saturé, on patiente et on réessaie au lieu d'échouer.
 func (c *Client) OriginChunk(ctx context.Context, root string, i int) ([]byte, error) {
-	return c.get(ctx, wire.KindChunk, root, i)
+	select {
+	case c.originSem <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	defer func() { <-c.originSem }()
+	var err error
+	for attempt := 0; attempt < 5; attempt++ {
+		var data []byte
+		if data, err = c.get(ctx, wire.KindChunk, root, i); err == nil || !strings.Contains(err.Error(), "simultanées") {
+			return data, err
+		}
+		select {
+		case <-time.After(time.Duration(200*(attempt+1)) * time.Millisecond):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return nil, err
 }
 
 // Find : bénévoles d'une racine, chaque fiche vérifiée (ID ↔ clé ↔ clé Noise).
