@@ -40,6 +40,12 @@ const (
 	TMeshIndex   // annuaire des bénévoles du relais (remplace le précédent)
 	TMeshRPC     // appel à l'origine pour le compte d'un relais sans accès direct
 	TMeshRPCResp // réponse à TMeshRPC
+
+	// Circuits (routage en oignon) : pair ↔ relais d'entrée, et relais ↔ relais.
+	TCircCreate  // ouvre un circuit sur ce lien (Circ) : échange de clés avec le relais
+	TCircCreated // réponse du relais à TCircCreate
+	TCircCell    // cellule chiffrée en couches, dans un sens ou dans l'autre
+	TCircDestroy // ferme le circuit
 )
 
 const (
@@ -99,7 +105,8 @@ type Header struct {
 	Hosts    []HostInfo     `json:"hosts,omitempty"`
 	To       string         `json:"to,omitempty"`
 	From     string         `json:"from,omitempty"`
-	SID      uint64         `json:"sid,omitempty"` // session de bout en bout
+	SID      uint64         `json:"sid,omitempty"`  // session de bout en bout
+	Circ     uint64         `json:"circ,omitempty"` // circuit, propre à chaque lien
 	Peer     string         `json:"peer,omitempty"`
 	Hash     []byte         `json:"hash,omitempty"`
 }
@@ -136,7 +143,7 @@ func Decode(b []byte) (*Frame, error) {
 		return nil, errors.New("wire: longueurs invalides")
 	}
 	f := &Frame{T: Type(b[0])}
-	if f.T < TChallenge || f.T > TMeshRPCResp {
+	if f.T < TChallenge || f.T > TCircDestroy {
 		return nil, fmt.Errorf("wire: type inconnu %d", b[0])
 	}
 	if err := json.Unmarshal(b[3:3+hl], &f.H); err != nil {
