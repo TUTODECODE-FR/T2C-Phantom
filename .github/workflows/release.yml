@@ -219,6 +219,21 @@ jobs:
         with:
           name: release-notes
           path: notes
+      - name: Cohérence des fichiers et des sommes de contrôle
+        if: steps.cfg.outputs.on
+        working-directory: out
+        run: |
+          set -euo pipefail
+          # chaque fichier publié doit figurer dans SHA256SUMS.txt, et chaque somme doit correspondre
+          sha256sum -c SHA256SUMS.txt
+          for f in *; do
+            [ "$f" = SHA256SUMS.txt ] && continue
+            grep -q "  $f\$" SHA256SUMS.txt || { echo "::error::$f absent de SHA256SUMS.txt"; exit 1; }
+          done
+          listed=$(wc -l < SHA256SUMS.txt); present=$(( $(ls | wc -l) - 1 ))
+          [ "$listed" -eq "$present" ] || { echo "::error::$listed sommes pour $present fichiers"; exit 1; }
+          echo "$present fichiers, sommes vérifiées"
+
       - name: Fichiers → registre GitLab + release
         if: steps.cfg.outputs.on
         run: |
@@ -249,4 +264,8 @@ jobs:
           elif [ "${code:0:1}" != 2 ]; then
             cat /tmp/r.json; exit 1
           fi
-          echo "Release GitLab $TAG publiée"
+          # contrôle final : la release GitLab référence exactement les fichiers publiés sur GitHub
+          got=$(curl -fsS -H "PRIVATE-TOKEN: $GITLAB_TOKEN" "$api/releases/$TAG" | jq '[.assets.links[].name] | unique | length')
+          want=$(ls out | wc -l)
+          [ "$got" -eq "$want" ] || { echo "::error::GitLab : $got fichiers liés au lieu de $want"; exit 1; }
+          echo "Release GitLab $TAG publiée ($got fichiers)"
