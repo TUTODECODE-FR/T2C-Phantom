@@ -184,6 +184,12 @@ async function pollStatus() {
     }
     pill.className = 'pill ' + cls;
     $('statusText').textContent = txt;
+    // bouton de connexion : visible sur l'écran principal
+    const running = s.status === 'running';
+    const btn = $('btnConn');
+    btn.hidden = $('home').hidden || state.connBusy;
+    btn.textContent = running ? 'Se déconnecter' : 'Se connecter';
+    btn.className = running ? 'btn small ghost' : 'btn small primary';
     const anon = s.status === 'running' && s.connected && s.anonymous;
     $('anonPill').hidden = !anon;
     $('anonPill').title = anon ? `Tes demandes traversent ${s.circuitHops} relais : aucun ne connaît à la fois ton adresse et ce que tu consultes.` : '';
@@ -331,6 +337,23 @@ async function reconnect() {
 }
 
 async function disconnect() { await api('/api/stop', { method: 'POST' }); }
+
+// toggleConnection : se déconnecter du réseau (plus aucun échange, bénévolat
+// suspendu, les sites .t2c ne s'ouvrent plus) ou s'y reconnecter.
+async function toggleConnection() {
+    state.connBusy = true;
+    $('btnConn').hidden = true;
+    try {
+        if (state.status.status === 'running') {
+            await disconnect();
+        } else {
+            await startClient();
+        }
+    } finally {
+        state.connBusy = false;
+        await pollStatus();
+    }
+}
 
 async function disableProxy() {
     await api('/api/setup', { method: 'DELETE' });

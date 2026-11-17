@@ -15,6 +15,7 @@
     <div class="topbar-right">
         <span class="pill anon" id="anonPill" hidden>Anonyme</span>
         <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">Déconnecté</span></span>
+        <button class="btn small" id="btnConn" onclick="toggleConnection()" hidden>Se déconnecter</button>
         <button class="btn ghost small" id="btnSettings" onclick="toggleSettings()" hidden>Réglages</button>
     </div>
 </header>
@@ -129,7 +130,6 @@
             <button class="btn small" onclick="reconnect()">Reconnecter</button>
             <button class="btn small" onclick="restartWizard()">Refaire l'assistant</button>
             <button class="btn small ghost" onclick="disableProxy()">Désactiver le proxy</button>
-            <button class="btn small ghost" onclick="disconnect()">Déconnecter</button>
         </div>
         <p class="muted small-text" id="lastError"></p>
     </section>
