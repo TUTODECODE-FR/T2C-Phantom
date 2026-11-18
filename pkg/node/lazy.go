@@ -44,7 +44,13 @@ type lazySite struct {
 	zr    *zip.Reader
 	files map[string]*zip.File
 	dirs  map[string][]string // dossier → noms directs
+
+	hot   map[int][]byte // derniers morceaux lus (évite de relire le disque)
+	hotMu sync.Mutex
 }
+
+// readAhead : morceaux suivants demandés en même temps (gros fichiers plus rapides).
+const readAhead = 8
 
 // SiteFS : le site sous forme de système de fichiers. Site déjà présent en
 // entier (copie de bénévole ou ancienne extraction) : lu localement ; sinon
@@ -179,7 +185,17 @@ func (ls *lazySite) partPath(i int) string { return filepath.Join(ls.parts, strc
 func (ls *lazySite) chunks(first, last int) (map[int][]byte, error) {
 	out := map[int][]byte{}
 	var missing []int
+	ls.hotMu.Lock()
 	for i := first; i <= last; i++ {
+		if b, ok := ls.hot[i]; ok {
+			out[i] = b
+		}
+	}
+	ls.hotMu.Unlock()
+	for i := first; i <= last; i++ {
+		if out[i] != nil {
+			continue
+		}
 		if b, err := os.ReadFile(ls.partPath(i)); err == nil && ls.m.VerifyChunk(i, b) {
 			out[i] = b
 		} else {
@@ -187,7 +203,14 @@ func (ls *lazySite) chunks(first, last int) (map[int][]byte, error) {
 		}
 	}
 	if len(missing) == 0 {
+		ls.remember(out)
 		return out, nil
+	}
+	// lecture anticipée : un fichier se lit d'un bout à l'autre
+	for i := last + 1; i < len(ls.m.Chunks) && i <= last+readAhead; i++ {
+		if _, err := os.Stat(ls.partPath(i)); err != nil {
+			missing = append(missing, i)
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -202,11 +225,43 @@ func (ls *lazySite) chunks(first, last int) (map[int][]byte, error) {
 		return nil, err
 	}
 	for i, b := range got {
-		out[i] = b
 		_ = os.WriteFile(ls.partPath(i), b, 0o600)
+		if i >= first && i <= last {
+			out[i] = b
+		}
 	}
+	ls.remember(out)
 	return out, nil
 }
+
+func (ls *lazySite) remember(m map[int][]byte) {
+	ls.hotMu.Lock()
+	defer ls.hotMu.Unlock()
+	if ls.hot == nil || len(ls.hot) > 16 {
+		ls.hot = map[int][]byte{}
+	}
+	for i, b := range m {
+		ls.hot[i] = b
+	}
+}
+
+// Stream : un gros fichier lu au fil de l'eau (le navigateur affiche la
+// progression) au lieu d'être assemblé en mémoire avant d'être envoyé.
+func (ls *lazySite) Stream(name string) (io.ReadCloser, int64, bool) {
+	name = strings.TrimPrefix(path.Clean("/"+name), "/")
+	f, ok := ls.files[name]
+	if !ok || f.UncompressedSize64 > MaxServedFile || f.UncompressedSize64 < StreamFrom {
+		return nil, 0, false
+	}
+	rc, err := f.Open()
+	if err != nil {
+		return nil, 0, false
+	}
+	return rc, int64(f.UncompressedSize64), true
+}
+
+// StreamFrom : taille à partir de laquelle un fichier est envoyé au fil de l'eau.
+const StreamFrom = 1 << 20
 
 // peers : bénévoles du site, redemandés au plus toutes les 2 minutes.
 func (ls *lazySite) peers(ctx context.Context, c *peerclient.Client) []wire.HostInfo {

@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +50,23 @@ func (s *Server) serveSite(w http.ResponseWriter, req *http.Request, domain stri
 	w.Header().Set("X-T2C-Root", e.Root)
 	w.Header().Set("X-T2C-Verified", "manifest-signed")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if st, ok := hfs.(streamer); ok && !hiddenPath(req.URL.Path) {
+		if rc, size, ok := st.Stream(req.URL.Path); ok {
+			// gros fichier : envoyé au fil de l'eau, taille annoncée (barre de progression)
+			defer rc.Close()
+			ct := mime.TypeByExtension(path.Ext(req.URL.Path))
+			if ct == "" {
+				ct = "application/octet-stream"
+			}
+			w.Header().Set("Content-Type", ct)
+			w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+			if req.Method == http.MethodHead {
+				return
+			}
+			_, _ = io.Copy(w, io.LimitReader(rc, size))
+			return
+		}
+	}
 	http.FileServer(siteFS{hfs}).ServeHTTP(w, req)
 }
 
@@ -79,6 +99,20 @@ func (f siteFS) Open(name string) (http.File, error) {
 // elle-même sur chaque site .t2c (une page comme tutodecode.t2c peut ainsi
 // afficher tous les sites, à jour, sans rien demander au réseau en plus).
 const SitesPath = "/.well-known/t2c/sites.json"
+
+type streamer interface {
+	Stream(name string) (io.ReadCloser, int64, bool)
+}
+
+// hiddenPath : un élément du chemin commence par « . » (jamais servi).
+func hiddenPath(p string) bool {
+	for _, part := range strings.Split(p, "/") {
+		if strings.HasPrefix(part, ".") && part != "." && part != ".." {
+			return true
+		}
+	}
+	return strings.Contains(p, "..")
+}
 
 type lazySites interface {
 	SiteFS(ctx context.Context, domain string) (http.FileSystem, *trust.SiteEntry, error)
