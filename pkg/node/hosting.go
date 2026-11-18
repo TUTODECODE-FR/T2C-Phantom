@@ -27,9 +27,14 @@ type Hosting struct {
 	// Relais caché (milieu des circuits des autres) : activé sauf refus explicite.
 	HiddenRelay *bool `json:"hidden_relay,omitempty"`
 	RelayKBs    int64 `json:"relay_kbs"` // débit maximal relayé
+	// RelayExit : le relais caché accepte aussi d'être sortie de circuit.
+	RelayExit *bool `json:"relay_exit,omitempty"`
+	// AnonMode : « partage » (défaut) ou « maximal » (sortie toujours chez l'association).
+	AnonMode string `json:"anon_mode,omitempty"`
 }
 
-func (h Hosting) relayOn() bool { return h.HiddenRelay == nil || *h.HiddenRelay }
+func (h Hosting) relayOn() bool     { return h.HiddenRelay == nil || *h.HiddenRelay }
+func (h Hosting) relayExitOn() bool { return h.RelayExit == nil || *h.RelayExit }
 
 const (
 	defaultDiskMB    = 2048
@@ -50,6 +55,9 @@ func (h *Hosting) normalize() {
 	}
 	if h.RelayKBs <= 0 {
 		h.RelayKBs = defaultRelayKBs
+	}
+	if h.AnonMode != peerclient.ModeMaximal {
+		h.AnonMode = peerclient.ModePartage
 	}
 	seen := map[string]bool{}
 	var sites []string

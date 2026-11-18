@@ -187,6 +187,7 @@ func (n *Node) run(ctx context.Context) {
 			RootKey: n.cfg.RootKey, Store: n.store, Guard: n.guard,
 			UploadBytesPerSec: n.hostingPrefs().MaxUploadKBs * 1024,
 			Anonymous:         anon, EntryKey: entry, Relays: keys, AvoidRelay: n.hiddenRelayKey(),
+			AnonMode: n.hostingPrefs().AnonMode,
 		})
 		cancel()
 		if err != nil {

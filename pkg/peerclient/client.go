@@ -41,6 +41,10 @@ type Options struct {
 	Relays    []RelayKey
 	// AvoidRelay : clé du relais caché de ce même membre (jamais dans ses propres circuits).
 	AvoidRelay ed25519.PublicKey
+	// AnonMode : ModePartage (défaut) ou ModeMaximal ; AnonModeFunc, s'il est
+	// fourni, est consulté à chaque nouveau circuit (réglage modifiable à chaud).
+	AnonMode     string
+	AnonModeFunc func() string
 	// OnServe (bénévole) : appelé avec l'identité présentée par chaque demandeur
 	// servi (vérification de l'anonymat, statistiques). Facultatif.
 	OnServe func(from string)
@@ -66,7 +70,7 @@ type Client struct {
 	circ      *circuit     // circuit en oignon actif (mode anonyme)
 	originSem chan struct{}
 	building  map[uint64]*circuit
-	vols      []ed25519.PublicKey // relais bénévoles annoncés par le relais d'entrée
+	vols      []volRelay // relais bénévoles annoncés par le relais d'entrée
 	volAt     time.Time
 	volBad    map[string]time.Time // bénévoles qui n'ont pas répondu (évités 30 min)
 }

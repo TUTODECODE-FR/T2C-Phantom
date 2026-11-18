@@ -11,18 +11,29 @@ import (
 // relais signée par la racine). Le serveur n'y touche pas : un serveur piraté
 // ne peut pas y glisser de relais.
 //
-// Ces relais ne servent qu'au MILIEU des circuits : ils ne voient ni l'adresse
-// du client (connue du relais d'entrée) ni ce qui est demandé (relais de sortie).
+// Un relais bénévole au milieu d'un circuit ne voit ni l'adresse du membre ni
+// ce qu'il demande ; en sortie (s'il l'accepte), il voit les demandes sous un
+// pseudonyme jetable, jamais l'adresse (connue du seul relais d'entrée).
 const domVolunteers = "t2c/volunteers/v1"
 
 // MaxVolunteerList : taille maximale d'une liste publiée.
 const MaxVolunteerList = 256
 
 type VolunteerList struct {
-	Relay      string   `json:"relay"` // clé du relais officiel qui signe (hex)
-	Issued     int64    `json:"issued"`
-	Volunteers []string `json:"volunteers"` // clés publiques des relais bénévoles (hex)
-	Sig        string   `json:"sig"`
+	Relay      string           `json:"relay"` // clé du relais officiel qui signe (hex)
+	Issued     int64            `json:"issued"`
+	Volunteers []VolunteerEntry `json:"volunteers"`
+	Sig        string           `json:"sig"`
+}
+
+// VolunteerEntry : un relais bénévole. Family : empreinte salée de son réseau
+// (deux relais de même famille ne sont jamais dans un même circuit), jamais
+// son adresse. Since : première connexion (montée en charge progressive).
+type VolunteerEntry struct {
+	Key    string `json:"key"`
+	Family string `json:"family"`
+	Since  int64  `json:"since"`
+	Exit   bool   `json:"exit,omitempty"`
 }
 
 func (v *VolunteerList) Sign(relay ed25519.PrivateKey) error {
@@ -38,9 +49,12 @@ func (v *VolunteerList) Verify(relay ed25519.PublicKey, now time.Time) error {
 	if len(v.Volunteers) > MaxVolunteerList || now.Unix()-v.Issued > 600 || v.Issued-now.Unix() > 60 {
 		return errors.New("trust: liste de bénévoles périmée ou invalide")
 	}
-	for _, k := range v.Volunteers {
-		if _, err := ParsePublicKey(k); err != nil {
+	for _, e := range v.Volunteers {
+		if _, err := ParsePublicKey(e.Key); err != nil {
 			return err
+		}
+		if len(e.Family) > 32 || e.Since > now.Unix()+60 {
+			return errors.New("trust: entrée de bénévole invalide")
 		}
 	}
 	u := *v

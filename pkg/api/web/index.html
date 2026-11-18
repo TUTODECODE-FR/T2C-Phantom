@@ -107,6 +107,13 @@
             <label class="check"><input type="checkbox" id="chkRelay" onchange="saveHosting(!$('chkHost').checked)"> <strong>Relais caché</strong> : aider l'anonymat du réseau</label>
             <p class="muted small-text">Ton application transporte des cellules chiffrées pour les autres membres, au milieu de leurs circuits. Elle ne voit ni qui ils sont ni ce qu'ils lisent, ton adresse n'est publiée nulle part, et sa clé n'a aucun lien avec ton identité. <span id="relayState"></span></p>
             <label class="small-text">Débit maximal <input type="number" id="relayKbs" min="32" step="32" onchange="saveHosting(!$('chkHost').checked)"> Ko/s</label>
+            <label class="check small-text"><input type="checkbox" id="chkRelayExit" onchange="saveHosting(!$('chkHost').checked)"> Accepter d'être <strong>sortie</strong> de circuit : mon relais transmet les demandes des autres, sous un pseudonyme jetable, sans jamais connaître leur adresse ; uniquement du contenu signé par TUTODECODE.</label>
+            <label class="small-text">Mon anonymat :
+                <select id="anonMode" onchange="saveHosting(!$('chkHost').checked)">
+                    <option value="partage">Partagé (conseillé) : la sortie peut être le relais d'un membre</option>
+                    <option value="maximal">Maximal : la sortie est toujours un relais de l'association</option>
+                </select>
+            </label>
         </div>
         <div id="hostPanel" hidden>
             <label class="check"><input type="checkbox" id="chkHostAll" onchange="renderHostSites()"> Tous les sites du catalogue</label>

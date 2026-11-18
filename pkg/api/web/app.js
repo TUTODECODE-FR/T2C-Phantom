@@ -296,6 +296,8 @@ async function loadHosting() {
     $('maxUpload').value = r.hosting.max_upload_kbs;
     $('chkRelay').checked = r.hosting.hidden_relay !== false;
     $('relayKbs').value = r.hosting.relay_kbs;
+    $('chkRelayExit').checked = r.hosting.relay_exit !== false;
+    $('anonMode').value = r.hosting.anon_mode || 'partage';
     $('relayState').textContent = r.hiddenRelay
         ? `Actif : relié à ${r.relayLinks} relais officiel${r.relayLinks > 1 ? 's' : ''}.`
         : ($('chkRelay').checked ? 'Démarrage…' : 'Désactivé.');
@@ -327,6 +329,8 @@ async function saveHosting(off) {
         max_upload_kbs: Number($('maxUpload').value) || 0,
         hidden_relay: $('chkRelay').checked,
         relay_kbs: Number($('relayKbs').value) || 0,
+        relay_exit: $('chkRelayExit').checked,
+        anon_mode: $('anonMode').value,
     };
     const r = await api('/api/hosting', { method: 'POST', body });
     $('hostSaved').textContent = r.ok ? (off ? 'Bénévolat arrêté, copies supprimées.' : 'Enregistré : les copies se mettent à jour.') : 'Erreur : ' + (r.error || '');

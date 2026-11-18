@@ -31,6 +31,7 @@ type hiddenRelay struct {
 	cancel   context.CancelFunc
 	official []string
 	kbs      int64
+	exit     bool
 }
 
 // officialMeshRelays : relais officiels joignables (liste signée par la racine).
@@ -71,7 +72,7 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 	n.mu.Lock()
 	cur := n.hidden
 	n.mu.Unlock()
-	if cur != nil && (!want || !slices.Equal(cur.official, official) || cur.kbs != h.RelayKBs) {
+	if cur != nil && (!want || !slices.Equal(cur.official, official) || cur.kbs != h.RelayKBs || cur.exit != h.relayExitOn()) {
 		n.stopHiddenRelay()
 		cur = nil
 	}
@@ -86,14 +87,14 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 	b := broker.New(broker.Config{RootKey: n.cfg.RootKey, MintBits: n.cfg.MintBits,
 		GlobalBytesPerSec: float64(h.RelayKBs) * 1024}, broker.NewMeshOrigin())
 	if err := b.EnableMesh(broker.MeshConfig{Key: id.Priv, Volunteer: true, Mint: id.MintNonce, MintBits: id.MintBits,
-		Official: official, Every: n.hiddenEvery()}); err != nil {
+		VolunteerExit: h.relayExitOn(), Official: official, Every: n.hiddenEvery()}); err != nil {
 		n.setErr(err)
 		return
 	}
 	rctx, cancel := context.WithCancel(ctx)
 	go b.RunMesh(rctx)
 	n.mu.Lock()
-	n.hidden = &hiddenRelay{b: b, cancel: cancel, official: official, kbs: h.RelayKBs}
+	n.hidden = &hiddenRelay{b: b, cancel: cancel, official: official, kbs: h.RelayKBs, exit: h.relayExitOn()}
 	n.mu.Unlock()
 }
 
@@ -142,6 +143,9 @@ func (n *Node) relayIdentity() (*peerid.Identity, error) {
 	n.relayID = id
 	return id, nil
 }
+
+// HiddenRelayKey : clé publique du relais caché (nil s'il n'a jamais tourné).
+func (n *Node) HiddenRelayKey() ed25519.PublicKey { return n.hiddenRelayKey() }
 
 // hiddenRelayKey : clé du relais caché s'il existe déjà (pour l'exclure de nos propres circuits).
 func (n *Node) hiddenRelayKey() ed25519.PublicKey {
