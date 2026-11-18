@@ -10,9 +10,10 @@ import (
 
 // Délégation : la clé racine reste hors ligne (poste de l'éditeur). Elle signe
 // une délégation courte qui autorise une clé de service (sur le serveur) à
-// signer UNIQUEMENT la liste des bénévoles et les tickets. Catalogue et
-// manifestes exigent toujours la clé racine : un serveur compromis ne peut
-// pas publier ni modifier de site.
+// signer UNIQUEMENT ce que ses portées nomment : liste des bénévoles, tickets,
+// ou un site précis (« site:<id> », voir SiteHead). Le catalogue exige
+// toujours la clé racine : une clé déléguée ne peut ni créer de site ni
+// toucher à un site qui ne lui est pas confié.
 const domDelegation = "t2c/delegation/v1"
 
 const (

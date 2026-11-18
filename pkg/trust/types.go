@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -36,6 +37,10 @@ type Catalog struct {
 	Issued  int64       `json:"issued"`
 	Sites   []SiteEntry `json:"sites"`
 	Sig     string      `json:"sig"`
+	// Heads : têtes de site (hors signature racine, chacune signée par sa clé
+	// déléguée). Appliquées par Verify ; Sites devient alors la vue effective.
+	Heads []SiteHead `json:"heads,omitempty"`
+	base  []SiteEntry
 }
 
 // HostEntry : un bénévole approuvé. Pas d'IP : seulement l'ID de pair libp2p,
@@ -107,8 +112,9 @@ func verify(pub ed25519.PublicKey, domain string, unsigned any, sigHex string) e
 // Chaque type signe une copie de lui-même avec Sig vide.
 
 func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
+	c.base = nil
 	u := *c
-	u.Sig = ""
+	u.Sig, u.Heads = "", nil
 	s, err := sign(priv, domCatalog, u)
 	c.Sig = s
 	return err
@@ -116,15 +122,21 @@ func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
 
 func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	u := *c
-	u.Sig = ""
+	u.Sig, u.Heads, u.base = "", nil, nil
+	u.Sites = c.Base()
 	if err := verify(pub, domCatalog, u, c.Sig); err != nil {
 		return err
 	}
-	for _, s := range c.Sites {
+	for _, s := range u.Sites {
 		if !isHexHash(s.Root) || s.ID == "" {
 			return fmt.Errorf("trust: entrée de catalogue invalide %q", s.ID)
 		}
 	}
+	if c.base == nil {
+		c.base = slices.Clone(c.Sites)
+	}
+	c.Sites = slices.Clone(c.base)
+	c.applyHeads(pub)
 	return nil
 }
 

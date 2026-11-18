@@ -28,13 +28,14 @@ func TestCatalogSignVerifyTamper(t *testing.T) {
 	if err := c.Verify(pub); err != nil {
 		t.Fatalf("signature valide refusée: %v", err)
 	}
-	c.Sites[0].Root = string(bytes.Repeat([]byte("b"), 64))
-	if c.Verify(pub) == nil {
+	// altération du document reçu (Sites après Verify est une vue dérivée de la base signée)
+	tc := reload(t, c)
+	tc.Sites[0].Root = string(bytes.Repeat([]byte("b"), 64))
+	if tc.Verify(pub) == nil {
 		t.Fatal("catalogue modifié accepté")
 	}
 	other, _ := keys(t)
-	c.Sites[0].Root = string(root)
-	if c.Verify(other) == nil {
+	if reload(t, c).Verify(other) == nil {
 		t.Fatal("mauvaise clé acceptée")
 	}
 }

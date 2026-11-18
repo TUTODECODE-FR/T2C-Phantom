@@ -22,7 +22,9 @@ type Manifest struct {
 	Size      int64    `json:"size"`
 	ChunkSize int      `json:"chunk_size"`
 	Chunks    []string `json:"chunks"`
-	Sig       string   `json:"sig"`
+	// Deleg : clé de portée site:<Site> qui a signé (absente = clé racine).
+	Deleg *Delegation `json:"deleg,omitempty"`
+	Sig   string      `json:"sig"`
 }
 
 // BuildManifest lit r en entier (≤ MaxContentSize) et calcule le manifeste.
@@ -106,10 +108,14 @@ func (m *Manifest) Sign(priv ed25519.PrivateKey) error {
 }
 
 // Verify : signature de l'origine + structure interne.
-func (m *Manifest) Verify(pub ed25519.PublicKey) error {
+func (m *Manifest) Verify(root ed25519.PublicKey) error {
+	k, err := signerKey(root, m.Deleg, ScopeSite(m.Site))
+	if err != nil {
+		return err
+	}
 	u := *m
 	u.Sig = ""
-	if err := verify(pub, domManifest, u, m.Sig); err != nil {
+	if err := verify(k, domManifest, u, m.Sig); err != nil {
 		return err
 	}
 	return m.CheckStructure()

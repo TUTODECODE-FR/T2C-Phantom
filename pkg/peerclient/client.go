@@ -288,7 +288,15 @@ func (c *Client) Catalog(ctx context.Context) (*trust.Catalog, error) {
 	if err := cat.Verify(c.opt.RootKey); err != nil {
 		return nil, err
 	}
-	return &cat, c.guard.Accept("catalog", cat.Version)
+	if err := c.guard.Accept("catalog", cat.Version); err != nil {
+		return nil, err
+	}
+	for _, h := range cat.Heads { // tête de site plus ancienne que la dernière vue : refusée
+		if err := c.guard.Accept("head:"+h.Site, uint64(h.Issued)); err != nil {
+			return nil, err
+		}
+	}
+	return &cat, nil
 }
 
 // Hosts : liste signée des bénévoles / bannis (nil si l'origine n'en publie pas encore).
