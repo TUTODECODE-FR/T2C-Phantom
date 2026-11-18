@@ -162,14 +162,18 @@ Pour arrêter : désactive l'interrupteur. Tes copies sont supprimées et tu es 
 
 Conséquence : **ni un bénévole, ni un relais, ni Cloudflare, ni même un serveur piraté ne peut modifier un site** sans que ce soit détecté. Un morceau faux est rejeté et son expéditeur banni de ton côté.
 
-### 7.4 Téléchargement d'un site
+### 7.4 Téléchargement d'un site (à la demande)
+
+Un site est une archive zip découpée en morceaux de 256 Ko, dont chaque empreinte est signée. Depuis la v2.5, l'application **ne télécharge que les morceaux de la page que tu ouvres**, pas le site entier :
 
 1. Ton application résout l'adresse (`tutodecode.t2c`) dans le catalogue signé.
-2. Elle demande au relais quels bénévoles hébergent cette version, classés par score.
-3. Elle télécharge plusieurs morceaux en parallèle chez les meilleurs bénévoles, par des sessions **chiffrées de bout en bout** (Noise IK).
-4. Chaque morceau est vérifié ; en cas d'échec, elle passe à un autre bénévole.
-5. En dernier recours, le morceau vient du serveur d'origine, via le relais (avec un cache côté relais).
-6. Le site, vérifié, est servi à ton navigateur par le proxy local, en HTTPS grâce au certificat `.t2c`.
+2. Elle lit la table des matières du zip (le dernier morceau), puis seulement les morceaux qui contiennent la page demandée, et quelques morceaux suivants à l'avance.
+3. Elle demande au relais quels bénévoles hébergent cette version, classés par score, et télécharge en parallèle chez les meilleurs, par des sessions **chiffrées de bout en bout** (Noise IK).
+4. Chaque morceau est vérifié ; en cas d'échec, elle passe à un autre bénévole. En dernier recours, le morceau vient du serveur d'origine, via le relais.
+5. La page, vérifiée, est servie à ton navigateur par le proxy local, en HTTPS grâce au certificat `.t2c`. Les morceaux reçus restent en cache : la visite suivante est instantanée.
+6. Les gros fichiers (archives, dépôts de code) sont envoyés **au fil de l'eau** : ton navigateur affiche la progression.
+
+**Le premier chargement peut prendre quelques secondes, c'est normal** : les morceaux traversent deux relais chiffrés et viennent de bénévoles. Un gros téléchargement prend le temps qu'il faut, mais la barre de progression avance. Si une page reste vraiment bloquée, voir [Dépannage](#12-dépannage).
 
 ### 7.5 Bénévoles, tickets et score
 
@@ -180,8 +184,8 @@ Conséquence : **ni un bénévole, ni un relais, ni Cloudflare, ni même un serv
 
 ### 7.6 Plusieurs relais (fédération)
 
-- Le réseau peut compter **plusieurs relais**, tenus par des opérateurs de confiance et inscrits avec leur clé dans la liste signée. Ton application en choisit un au hasard, ce qui répartit la charge.
-- Les relais se relient entre eux par une liaison **authentifiée des deux côtés** : seuls ceux de la liste signée sont acceptés. Ils partagent l'annuaire des bénévoles et se transmettent les échanges chiffrés : tu peux télécharger chez un bénévole connecté à un autre relais.
+- Le réseau peut compter **plusieurs relais**, tenus par des opérateurs de confiance et inscrits avec leur clé dans la **liste des relais signée par la clé racine** de TUTODECODE (depuis la v2.5 ; avant, elle était signée par le serveur). Ton application en choisit un au hasard, ce qui répartit la charge. Un serveur piraté ne peut donc pas ajouter de relais espion : l'application et les autres relais le refusent.
+- Les relais se relient entre eux par une liaison **authentifiée des deux côtés** : seuls ceux de la liste signée par la racine sont acceptés. Ils partagent l'annuaire des bénévoles et se transmettent les échanges chiffrés : tu peux télécharger chez un bénévole connecté à un autre relais.
 - Un relais ne retransmet jamais une trame reçue d'un autre relais (un seul saut entre relais).
 - Un **relais caché** n'écoute rien sur Internet : c'est lui qui se connecte au relais principal par un réseau privé. Son adresse n'est publiée nulle part ; il ne sert que de relais intermédiaire ou de sortie dans les circuits anonymes.
 
@@ -208,7 +212,19 @@ Si quelqu'un interroge un relais ou un bénévole sur « qui a demandé quoi »,
 - Le relais s'authentifie auprès du serveur en **signant chaque requête** avec sa propre clé (horodatage et nombre aléatoire : non rejouable). Le serveur ne stocke aucun secret partagé, seulement des clés publiques.
 - Le serveur refuse toute requête qui porterait une adresse IP d'utilisateur.
 
-### 7.9 Intégration au navigateur
+### 7.9 Les sites officiels
+
+| Adresse | Contenu |
+|---|---|
+| `tutodecode.t2c` | portail : tous les sites du réseau, lus en direct dans le catalogue vérifié par ton application |
+| `cours.t2c` | les cours de TUTODECODE ; tous tiennent dans un fichier unique `cours.tdc` |
+| `repo.t2c` | le code source de TUTODECODE : consultable, en `.zip`, ou clonable avec `git` à travers T2C |
+
+- **`.tdc`** désigne un **fichier de cours** (format TUTODECODE Script, créé avec TDC-SDK / TDC-Studio, lu par T2DECODE) ; **`.t2c`** désigne un **site**.
+- `cours.tdc` est **signé par la clé racine** sur le poste de l'éditeur. T2DECODE, si l'option « Cours depuis T2C Phantom » est activée, vérifie lui-même cette signature au démarrage, refuse un fichier faux ou plus ancien, installe les cours et propose de redémarrer.
+- Cloner un dépôt sans GitHub : `git -c http.proxy=http://127.0.0.1:8080 clone http://repo.t2c/<nom>.git`.
+
+### 7.10 Intégration au navigateur
 
 - **Certificat local** limité aux noms `.t2c` (contrainte de nom critique) : même volé, il ne permet d'imiter aucun autre site.
 - **Fichier PAC** : seuls les `*.t2c` sont envoyés au proxy local (`127.0.0.1`, port 8080 par défaut, modifiable par `T2C_PROXY_PORT`), tout le reste part directement.
@@ -243,6 +259,10 @@ Précisions :
 | Langage | Go |
 | Application de bureau | Wails (interface web intégrée, sans ressource distante) |
 | Identité et signatures | Ed25519, preuve de travail de 22 bits |
+| Clé racine de l'éditeur | hors ligne, chiffrée par phrase de passe (scrypt N=2¹⁷, AES-256-GCM) |
+| Liste des relais | signée par la clé racine, version croissante (anti-retour arrière) |
+| Sites | archive zip lue à la demande (morceaux de 256 Ko), envoi au fil de l'eau des gros fichiers |
+| Cours | TUTODECODE Script (`.tdc`), signature Ed25519 vérifiée par T2DECODE |
 | Chiffrement de bout en bout entre membres | Noise IK (X25519, ChaCha20-Poly1305, BLAKE2s) |
 | Circuits anonymes | échange X25519 authentifié à clés éphémères, couches AES-256-GCM, cellules de taille fixe, trafic leurre, délais aléatoires |
 | Intégrité | SHA-256 par morceau de 256 Ko, manifestes et catalogue signés |
@@ -251,6 +271,7 @@ Précisions :
 | Relais ↔ serveur | réseau privé chiffré, requêtes signées Ed25519 non rejouables |
 | Navigateur | certificat local à contrainte de nom `.t2c`, fichier PAC |
 | Publication | GitHub Actions (applications macOS, Windows, Linux et outils en ligne de commande), sommes SHA-256, copie sur GitLab |
+| Vérification avant envoi | sur le poste du développeur : CI locale (`scripts/ci-local.sh`) et pentest local, lancés par un hook git, sans service en ligne |
 
 ---
 
@@ -332,6 +353,8 @@ La variable `T2C_DATA_DIR` permet de changer ce dossier. L'outil `t2c-peer` gard
 | Le navigateur affiche « non sécurisé » sur un `.t2c` | **Réglages** → **Refaire l'assistant**, puis ferme complètement et rouvre le navigateur. |
 | « … n'est pas dans le catalogue signé » | Ce site n'existe pas ou plus : seul le catalogue officiel est servi. |
 | Un site non `.t2c` ne charge plus | Quitte et relance l'application (le PAC est remis). En dernier recours : `t2c unsetup`. |
+| Une page met quelques secondes à s'afficher | **Normal** au premier passage : les morceaux traversent deux relais et viennent de bénévoles. Ensuite, elle est en cache. Un gros fichier affiche sa progression dans le navigateur. |
+| « Site inaccessible : morceau N … deadline exceeded » | Application antérieure à la v2.5, qui téléchargeait tout le site d'un coup : mets-la à jour. Sinon, réessaie : un autre bénévole sera choisi. |
 | Le badge « Anonyme » n'apparaît pas | Le réseau ne compte pour l'instant qu'un relais : le mode anonyme s'activera tout seul dès le deuxième. |
 | Port 8080 déjà utilisé | Lance l'application avec `T2C_PROXY_PORT=8081`, ou `t2c start -proxy 8081`. |
 | Linux : « installation automatique impossible » | `sudo apt install libnss3-tools`, puis **Refaire l'assistant**. |

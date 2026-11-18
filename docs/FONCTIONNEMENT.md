@@ -44,6 +44,7 @@ flowchart LR
 La clé racine de TUTODECODE n'est **jamais sur un serveur** : les sites sont signés hors ligne, sur le poste de l'éditeur, puis envoyés au serveur sous forme de paquet qu'il revérifie entièrement. Le serveur ne possède qu'une **clé de service déléguée** (durée limitée), autorisée à signer uniquement les tickets et la liste des bénévoles.
 
 Conséquence : **ni un bénévole, ni le relais, ni Cloudflare, ni même un serveur d'origine piraté ne peut modifier un site** sans que ce soit détecté. Un morceau modifié est rejeté, l'expéditeur est banni localement et signalé.
+- **Chargement à la demande** (v2.5) : l'application ne télécharge que les morceaux de la page ouverte (le site est une archive zip lisible fichier par fichier), chacun vérifié ; les gros fichiers arrivent au fil de l'eau.
 
 ## Bénévoles, tickets et score
 
@@ -61,6 +62,7 @@ Le réseau peut compter plusieurs relais, tenus par des opérateurs de confiance
 Les relais se relient entre eux par une liaison authentifiée des deux côtés. Ils partagent l'annuaire des bénévoles et se transmettent les échanges chiffrés : tu peux télécharger chez un bénévole connecté à un autre relais que le tien. Un seul relais joint le serveur d'origine ; les autres passent par lui et ne connaissent jamais son adresse.
 
 Chaque relais ne voit que l'IP des personnes qui se connectent à lui, jamais le contenu des échanges entre membres.
+- Depuis la v2.5, la liste des relais est **signée par la clé racine** (hors ligne), plus par le serveur : un serveur piraté ne peut pas y glisser de relais espion.
 
 ## Mode anonyme (routage en oignon)
 

@@ -28,6 +28,7 @@ T2C Phantom te permet d'ouvrir les sites **`.t2c`** de TUTODECODE (par exemple `
 - **Sites authentiques** — chaque site est signé par TUTODECODE et vérifié morceau par morceau : personne ne peut en modifier un octet en route.
 - **Mode anonyme** — dès que le réseau compte plusieurs relais, tes demandes traversent un circuit chiffré en couches : aucun relais ne relie ton IP à ce que tu consultes. Cellules de taille fixe, trafic leurre et délais aléatoires brouillent aussi l'analyse du trafic.
 - **Bénévole en option** — tu choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque et contrôlées régulièrement.
+- **Sites officiels** — `tutodecode.t2c` (portail de tous les sites), `cours.t2c` (cours de TUTODECODE, fichier unique `cours.tdc` signé) et `repo.t2c` (code source, clonable avec `git` sans GitHub).
 
 Voir aussi : [Guide complet](docs/GUIDE.md) · [Glossaire](docs/GUIDE.md#16-glossaire) · [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
 
@@ -63,6 +64,8 @@ Le fichier doit être marqué `OK` (ou, sous Windows, la ligne doit s'afficher).
 1. **Ouvre T2C Phantom.** Un assistant te guide une seule fois : certificat limité aux `.t2c`, choix du navigateur (Firefox conseillé), proxy, puis connexion au réseau pair à pair.
 2. **Ouvre un site du carnet** d'un clic, ou tape son adresse `.t2c`.
 3. **Deviens bénévole si tu veux** : choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque.
+
+> **Le premier chargement d'une page peut prendre quelques secondes : c'est normal.** Les morceaux du site traversent deux relais chiffrés et viennent de bénévoles. Seule la page ouverte est téléchargée, puis gardée en cache ; un gros fichier affiche sa progression dans le navigateur.
 
 Tout le reste de ta navigation ne change pas. À la fermeture de l'application, tes réglages d'origine sont remis. Tout savoir (utilisation, bénévolat, fonctionnement, sécurité, dépannage) : **[Guide complet](docs/GUIDE.md)**.
 
@@ -158,6 +161,8 @@ T2C Phantom n'est pas un outil d'anonymat absolu comme Tor : son objectif est de
 
 **Le certificat installé est-il dangereux ?** Il est généré sur ta machine et **ne peut signer que des noms `.t2c`** (contrainte inscrite dans le certificat) : même volé, il ne permettrait pas d'imiter ta banque ou un autre site.
 
+**C'est lent ?** Un peu, au premier passage, et c'est le prix de l'anonymat : chaque demande traverse deux relais, avec des cellules de taille fixe et de petits délais aléatoires. Depuis la v2.5, l'application ne télécharge que la page ouverte (pas le site entier), garde ce qu'elle a reçu en cache, et envoie les gros fichiers au fil de l'eau. Plus il y a de bénévoles et de relais, plus c'est rapide.
+
 **Hors ligne ?** Les sites déjà ouverts restent consultables depuis le cache ; pour en récupérer de nouveaux, il faut joindre le relais.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
@@ -169,7 +174,17 @@ T2C Phantom n'est pas un outil d'anonymat absolu comme Tor : son objectif est de
 - **v2.2** — assistant de premier lancement, carnet de sites, bénévolat choisi site par site avec copies chiffrées, liste de relais signée.
 - **v2.3** — fédération de relais : plusieurs points d'entrée reliés entre eux.
 - **v2.4** — mode anonyme : routage en oignon à travers les relais, pseudonyme jetable, échec fermé ; relais cachés (aucune écoute sur Internet) ; protection contre l'analyse de trafic (cellules de taille fixe, trafic leurre, délais aléatoires) ; correctifs issus d'un pentest.
+- **v2.5** — sites chargés à la demande (seulement la page ouverte, gros fichiers au fil de l'eau) ; liste des relais signée par la clé racine (un serveur piraté ne peut plus ajouter de relais espion) ; clé racine chiffrée par phrase de passe ; sites officiels `tutodecode.t2c`, `cours.t2c` (`cours.tdc` signé, vérifié aussi par T2DECODE) et `repo.t2c` ; vérification avant envoi (CI locale et pentest sur le poste du développeur).
 - **Plus tard** — applications signées (Apple / Windows), mises à jour automatiques.
+
+### Idées pour la suite
+
+- **Relais bénévoles derrière Cloudflare** : un bénévole fait tourner un relais avec un tunnel Cloudflare fourni par l'association (jeton révocable). Son adresse IP n'est jamais publiée, et l'association reste seule à décider qui devient relais (liste signée).
+- **Cloudflare devant le relais principal** : le VPS ne voit plus les adresses IP des utilisateurs.
+- **Releases signées** par la clé racine, vérifiables depuis `tutodecode.t2c`.
+- **Mode « relais bénévole » dans l'application**, activable en un clic.
+- **Mises à jour de sites par différence** : ne renvoyer aux bénévoles que les morceaux qui ont changé.
+- **Recherche dans les sites** et **favoris hors ligne** dans le carnet.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
