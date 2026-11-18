@@ -30,7 +30,7 @@ T2C Phantom te permet d'ouvrir les sites **`.t2c`** de TUTODECODE (par exemple `
 - **Bénévole en option** — tu choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque et contrôlées régulièrement.
 - **Sites officiels** — `tutodecode.t2c` (portail de tous les sites), `cours.t2c` (cours de TUTODECODE, fichier unique `cours.tdc` signé) et `repo.t2c` (code source, clonable avec `git` sans GitHub).
 
-Voir aussi : [Guide complet](docs/GUIDE.md) · [Glossaire](docs/GUIDE.md#16-glossaire) · [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
+Voir aussi : **[Vue d'ensemble](docs/VUE-ENSEMBLE.md)** (document de référence) · [Guide complet](docs/GUIDE.md) · [Glossaire](docs/GUIDE.md#16-glossaire) · [Comment ça marche](docs/FONCTIONNEMENT.md) · [Guide d'utilisation](docs/UTILISATION.md) · [Sécurité](SECURITY.md)
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
