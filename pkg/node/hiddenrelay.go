@@ -87,7 +87,7 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 	b := broker.New(broker.Config{RootKey: n.cfg.RootKey, MintBits: n.cfg.MintBits,
 		GlobalBytesPerSec: float64(h.RelayKBs) * 1024}, broker.NewMeshOrigin())
 	if err := b.EnableMesh(broker.MeshConfig{Key: id.Priv, Volunteer: true, Mint: id.MintNonce, MintBits: id.MintBits,
-		VolunteerExit: h.relayExitOn(), Official: official, Every: n.hiddenEvery()}); err != nil {
+		VolunteerExit: h.relayExitOn(), Official: official, Every: n.hiddenEvery(), MaxCircuits: 64}); err != nil {
 		n.setErr(err)
 		return
 	}
@@ -136,7 +136,11 @@ func (n *Node) relayIdentity() (*peerid.Identity, error) {
 	if n.relayID != nil {
 		return n.relayID, nil
 	}
-	id, err := peerid.LoadOrCreate(filepath.Join(n.cfg.DataDir, "relay-identity.json"), broker.DefaultVolunteerBits)
+	bits := n.cfg.RelayMintBits
+	if bits == 0 {
+		bits = broker.DefaultVolunteerBits
+	}
+	id, err := peerid.LoadOrCreate(filepath.Join(n.cfg.DataDir, "relay-identity.json"), bits)
 	if err != nil {
 		return nil, err
 	}

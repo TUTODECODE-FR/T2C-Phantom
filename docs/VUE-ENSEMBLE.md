@@ -219,9 +219,10 @@ Un argument que Tor n'a pas : **un relais T2C ne transporte que du contenu sign�
 ### 8.2 Le relais caché de chaque application (déjà en place)
 
 - L'application n'écoute rien et ne publie aucune adresse : c'est elle qui se connecte aux relais officiels.
-- Les relais officiels l'admettent **automatiquement** si sa clé a coûté une preuve de travail. Elle n'a que des droits réduits : transporter des cellules de circuit, rien d'autre (ni annuaire, ni accès au serveur, ni sortie).
+- Les relais officiels l'admettent **automatiquement** si sa clé a coûté une preuve de travail (24 bits : quelques secondes une seule fois), avec **au plus 8 relais par réseau** : en lancer des milliers depuis quelques machines ne sert à rien. Elle n'a que des droits réduits : transporter des cellules de circuit, rien d'autre (ni annuaire, ni accès au serveur, ni sortie).
 - Elle ne sert qu'au **milieu** des circuits : entrée officielle → relais caché → sortie officielle. Elle ne voit ni qui est le membre (connu du relais d'entrée) ni ce qu'il demande (relais de sortie).
-- Sa clé n'a **aucun lien** avec l'identité du membre, et elle n'est jamais utilisée dans ses propres circuits.
+- Sa clé n'a **aucun lien** avec l'identité du membre, et elle n'est jamais utilisée dans ses propres circuits. Il porte au plus 64 circuits à la fois, avec un débit plafonné.
+- Limite assumée : tant que les relais cachés ne sont reliés qu'aux relais officiels, leurs cellules passent deux fois par ceux-ci (entrée et sortie). Ils renforcent l'anonymat, pas la bande passante ; ce sont les relais publics bénévoles (8.4) qui soulagent.
 - L'annuaire des relais cachés est signé par chaque relais officiel, pas par le serveur.
 
 ### 8.3 Des circuits choisis comme Tor (en place, testé en interne)
@@ -239,7 +240,7 @@ Un argument que Tor n'a pas : **un relais T2C ne transporte que du contenu sign�
 ### 8.4 Ce qui arrive ensuite (testé en interne, publié avec le domaine `t2cphantom.eu.org`)
 
 1. **Les relais d'entrée volontaires**, en un clic dans l'application : « ma propre adresse » (l'application vérifie qu'elle est joignable et explique comment ouvrir le port) ou « un VPN avec redirection de port » (guide pas à pas, vérification automatique). Et pour ceux qui ont un serveur : `t2c-relay` en une commande. **C'est l'étape qui soulage vraiment les relais de l'association**, puisque les membres entrent aussi par eux.
-2. **Cloudflare devant le relais principal** : il ne voit plus les adresses IP des membres.
+2. **Cloudflare devant le relais principal** : le relais de l'association ne reçoit plus les adresses IP des membres (seul Cloudflare, en façade, les voit) et rejette toute connexion directe qui ne présente pas le certificat client de Cloudflare.
 
 ### 8.5 Mises à jour : automatiques, signées, progressives
 

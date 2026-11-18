@@ -46,6 +46,8 @@ type Config struct {
 	NoHiddenRelay bool
 	// HiddenRelayEvery : période de reconnexion du relais caché (tests).
 	HiddenRelayEvery time.Duration
+	// RelayMintBits : preuve de travail de la clé du relais caché (défaut broker.DefaultVolunteerBits).
+	RelayMintBits int
 }
 
 type HostedSite struct {
