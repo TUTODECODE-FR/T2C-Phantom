@@ -294,6 +294,11 @@ async function loadHosting() {
     $('chkHostAll').checked = r.hosting.all;
     $('maxDisk').value = r.hosting.max_disk_mb;
     $('maxUpload').value = r.hosting.max_upload_kbs;
+    $('chkRelay').checked = r.hosting.hidden_relay !== false;
+    $('relayKbs').value = r.hosting.relay_kbs;
+    $('relayState').textContent = r.hiddenRelay
+        ? `Actif : relié à ${r.relayLinks} relais officiel${r.relayLinks > 1 ? 's' : ''}.`
+        : ($('chkRelay').checked ? 'Démarrage…' : 'Désactivé.');
     renderHostSites();
     $('hostStats').innerHTML = `Copies : ${fmtBytes(r.storeBytes)} · envoyé aux autres membres : ${fmtBytes(r.servedBytes)} · sites hébergés : ${(r.hosted || []).length}`;
 }
@@ -320,6 +325,8 @@ async function saveHosting(off) {
         sites: off ? [] : [...document.querySelectorAll('.host-site:checked')].map((c) => c.value),
         max_disk_mb: Number($('maxDisk').value) || 0,
         max_upload_kbs: Number($('maxUpload').value) || 0,
+        hidden_relay: $('chkRelay').checked,
+        relay_kbs: Number($('relayKbs').value) || 0,
     };
     const r = await api('/api/hosting', { method: 'POST', body });
     $('hostSaved').textContent = r.ok ? (off ? 'Bénévolat arrêté, copies supprimées.' : 'Enregistré : les copies se mettent à jour.') : 'Erreur : ' + (r.error || '');

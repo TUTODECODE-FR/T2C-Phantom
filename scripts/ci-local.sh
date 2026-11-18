@@ -36,6 +36,14 @@ secrets_check() {
 	! git grep -n -I -E 'BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|glpat-[0-9A-Za-z_-]{20}|ghp_[0-9A-Za-z]{36}' -- . ':!scripts/ci-local.sh' | sed 's/$/ : secret interdit/' | grep .
 }
 
+# go mod verify : dépendances externes vérifiées ; nos dépôts locaux (remplacés
+# par un dossier voisin, t2c-relay) n'ont pas d'archive à vérifier
+modverify() {
+	out=$(go mod verify 2>&1)
+	rest=$(printf '%s\n' "$out" | grep -v -E '^t2c(-relay)? v0\.0\.0: missing ziphash' | grep -v '^all modules verified$' | grep .)
+	[ -z "$rest" ] || { printf '%s\n' "$rest"; return 1; }
+}
+
 cross() { # compile les outils en ligne de commande pour chaque système publié
 	for t in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64; do
 		GOOS=${t%/*} GOARCH=${t#*/} go build -o /dev/null ./cmd/... || { echo "compilation $t interdit"; return 1; }
@@ -46,7 +54,7 @@ cd "$ROOT" || exit 1
 echo "== T2C-Phantom"
 step "secrets et fichiers privés" secrets secrets_check
 step "formatage (gofmt)" gofmt gofmt_check
-step "dépendances (go mod verify)" modverify go mod verify
+step "dépendances (go mod verify)" modverify modverify
 step "compilation" build go build ./...
 step "analyse (go vet)" vet go vet ./...
 step "compilation 5 systèmes (outils CLI)" cross cross

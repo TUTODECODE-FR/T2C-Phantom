@@ -21,4 +21,7 @@ require (
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	t2c-relay v0.0.0
 )
+
+replace t2c-relay => ../T2C-Phantom-relay

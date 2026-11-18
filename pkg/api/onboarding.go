@@ -181,5 +181,6 @@ func (d *Dashboard) handleHosting(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"ok": true, "hosting": st.Hosting, "hosted": st.Hosted,
 		"storeBytes": st.StoreBytes, "servedBytes": st.Served, "volunteer": st.Volunteer,
+		"hiddenRelay": st.HiddenRelay, "relayLinks": st.RelayLinks,
 	})
 }

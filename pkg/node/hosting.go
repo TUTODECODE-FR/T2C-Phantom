@@ -23,7 +23,13 @@ type Hosting struct {
 	Sites        []string `json:"sites"`          // sinon : ces sites (id)
 	MaxDiskMB    int64    `json:"max_disk_mb"`    // place maximale des copies
 	MaxUploadKBs int64    `json:"max_upload_kbs"` // débit maximal envoyé aux autres pairs
+
+	// Relais caché (milieu des circuits des autres) : activé sauf refus explicite.
+	HiddenRelay *bool `json:"hidden_relay,omitempty"`
+	RelayKBs    int64 `json:"relay_kbs"` // débit maximal relayé
 }
+
+func (h Hosting) relayOn() bool { return h.HiddenRelay == nil || *h.HiddenRelay }
 
 const (
 	defaultDiskMB    = 2048
@@ -41,6 +47,9 @@ func (h *Hosting) normalize() {
 	}
 	if h.MaxUploadKBs <= 0 {
 		h.MaxUploadKBs = defaultUploadKBs
+	}
+	if h.RelayKBs <= 0 {
+		h.RelayKBs = defaultRelayKBs
 	}
 	seen := map[string]bool{}
 	var sites []string

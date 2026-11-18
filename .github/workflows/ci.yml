@@ -12,6 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Dépôt du relais (cloné à côté, comme en local)
+      uses: actions/checkout@v4
+      with:
+        repository: TUTODECODE-FR/T2C-Phantom-relay
+        path: .t2c-relay
+        token: ${{ secrets.RELAY_REPO_TOKEN || github.token }}
+    - name: Relais à côté du dépôt
+      shell: bash
+      run: mv .t2c-relay ../T2C-Phantom-relay
     
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -19,7 +28,11 @@ jobs:
         go-version-file: go.mod
         
     - name: Verify dependencies
-      run: go mod verify
+      run: |
+        # nos dépôts locaux (relais, remplacé par un dossier voisin) n'ont pas d'archive à vérifier
+        out=$(go mod verify 2>&1) || true
+        rest=$(printf '%s\n' "$out" | grep -v -E '^t2c(-relay)? v0\.0\.0: missing ziphash' | grep -v '^all modules verified$' | grep . || true)
+        [ -z "$rest" ] || { printf '%s\n' "$rest"; exit 1; }
       
     - name: Build
       run: go build -v ./...

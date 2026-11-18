@@ -103,6 +103,11 @@
             <label class="switch"><input type="checkbox" id="chkHost" onchange="toggleHosting()"><span></span></label>
         </div>
         <p class="muted small-text">Héberge une copie de certains sites pour aider le réseau. Tes copies sont <strong>chiffrées sur ton disque</strong> et revérifiées à chaque envoi : une copie altérée n'est jamais servie. Les autres membres ne voient que ta clé pseudonyme.</p>
+        <div class="relay-box">
+            <label class="check"><input type="checkbox" id="chkRelay" onchange="saveHosting(!$('chkHost').checked)"> <strong>Relais caché</strong> : aider l'anonymat du réseau</label>
+            <p class="muted small-text">Ton application transporte des cellules chiffrées pour les autres membres, au milieu de leurs circuits. Elle ne voit ni qui ils sont ni ce qu'ils lisent, ton adresse n'est publiée nulle part, et sa clé n'a aucun lien avec ton identité. <span id="relayState"></span></p>
+            <label class="small-text">Débit maximal <input type="number" id="relayKbs" min="32" step="32" onchange="saveHosting(!$('chkHost').checked)"> Ko/s</label>
+        </div>
         <div id="hostPanel" hidden>
             <label class="check"><input type="checkbox" id="chkHostAll" onchange="renderHostSites()"> Tous les sites du catalogue</label>
             <div id="hostSites" class="host-sites"></div>

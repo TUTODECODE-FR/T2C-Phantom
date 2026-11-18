@@ -73,6 +73,8 @@ const (
 	KindHosts    = "hosts"
 	KindManifest = "manifest"
 	KindChunk    = "chunk"
+	// KindVolunteers : relais bénévoles cachés connectés au relais (liste signée par lui)
+	KindVolunteers = "volunteers"
 )
 
 // HostInfo : un bénévole, tel que le VPS le présente (aucune IP).

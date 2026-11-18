@@ -42,6 +42,10 @@ type Config struct {
 	Carnet    map[string]string
 	// NoAnonymity : désactive les circuits en oignon (tests, dépannage).
 	NoAnonymity bool
+	// NoHiddenRelay : jamais de relais caché, quels que soient les réglages.
+	NoHiddenRelay bool
+	// HiddenRelayEvery : période de reconnexion du relais caché (tests).
+	HiddenRelayEvery time.Duration
 }
 
 type HostedSite struct {
@@ -51,23 +55,25 @@ type HostedSite struct {
 }
 
 type Status struct {
-	Connected  bool         `json:"connected"`
-	ID         string       `json:"id"`
-	Relay      string       `json:"relay"`
-	Volunteer  bool         `json:"volunteer"`
-	Hosting    Hosting      `json:"hosting"`
-	Anonymous  bool         `json:"anonymous"`    // demandes par circuit en oignon
-	Hops       int          `json:"circuit_hops"` // relais du circuit
-	Relays     int          `json:"relays"`       // relais connus dans la liste signée
-	StoreBytes int64        `json:"store_bytes"`
-	Served     int64        `json:"served_bytes"`
-	Hosted     []HostedSite `json:"hosted"`
-	CatalogVer uint64       `json:"catalog_version"`
-	LastError  string       `json:"last_error,omitempty"`
-	FromPeers  int64        `json:"chunks_from_peers"`
-	FromOrigin int64        `json:"chunks_from_origin"`
-	BadChunks  int64        `json:"bad_chunks_rejected"`
-	Peers      []PeerInfo   `json:"peers"`
+	Connected   bool         `json:"connected"`
+	ID          string       `json:"id"`
+	Relay       string       `json:"relay"`
+	Volunteer   bool         `json:"volunteer"`
+	Hosting     Hosting      `json:"hosting"`
+	Anonymous   bool         `json:"anonymous"`    // demandes par circuit en oignon
+	Hops        int          `json:"circuit_hops"` // relais du circuit
+	Relays      int          `json:"relays"`       // relais connus dans la liste signée
+	HiddenRelay bool         `json:"hidden_relay"` // relais caché bénévole actif
+	RelayLinks  int          `json:"relay_links"`  // relais officiels auxquels il est relié
+	StoreBytes  int64        `json:"store_bytes"`
+	Served      int64        `json:"served_bytes"`
+	Hosted      []HostedSite `json:"hosted"`
+	CatalogVer  uint64       `json:"catalog_version"`
+	LastError   string       `json:"last_error,omitempty"`
+	FromPeers   int64        `json:"chunks_from_peers"`
+	FromOrigin  int64        `json:"chunks_from_origin"`
+	BadChunks   int64        `json:"bad_chunks_rejected"`
+	Peers       []PeerInfo   `json:"peers"`
 }
 
 // PeerInfo : un bénévole rencontré (clé pseudonyme, jamais d'IP).
@@ -95,6 +101,9 @@ type Node struct {
 	peers     map[string]PeerInfo
 	fetching  map[string]*sync.Mutex // racine → verrou (pas deux téléchargements du même site)
 	lazy      map[string]*lazySite   // racine → site lu à la demande
+	hidden    *hiddenRelay           // relais caché bénévole (nil = arrêté)
+	relayID   *peerid.Identity       // identité du relais caché (distincte de id)
+	relayIDMu sync.Mutex
 	stats     struct{ peers, origin, bad int64 }
 	hosting   Hosting
 	relay     string // relais actuellement utilisé
@@ -144,6 +153,7 @@ func Start(ctx context.Context, cfg Config) (*Node, error) {
 	n.loadStore()
 	ctx, n.cancel = context.WithCancel(ctx)
 	go n.run(ctx)
+	go n.hiddenRelayLoop(ctx)
 	return n, nil
 }
 
@@ -176,7 +186,7 @@ func (n *Node) run(ctx context.Context) {
 		c, err := peerclient.Dial(dctx, url, n.id, peerclient.Options{
 			RootKey: n.cfg.RootKey, Store: n.store, Guard: n.guard,
 			UploadBytesPerSec: n.hostingPrefs().MaxUploadKBs * 1024,
-			Anonymous:         anon, EntryKey: entry, Relays: keys,
+			Anonymous:         anon, EntryKey: entry, Relays: keys, AvoidRelay: n.hiddenRelayKey(),
 		})
 		cancel()
 		if err != nil {
@@ -429,6 +439,7 @@ func peerInfo(c *peerclient.Client, h wire.HostInfo, root string) PeerInfo {
 // --- état ----------------------------------------------------------------------------
 
 func (n *Node) Status() Status {
+	links := n.hiddenRelayLinks() // prend n.mu : avant le verrou ci-dessous
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	st := Status{
@@ -442,6 +453,8 @@ func (n *Node) Status() Status {
 		st.Hops = n.client.CircuitHops()
 	}
 	st.Relays = len(n.relayKeys())
+	st.RelayLinks = links
+	st.HiddenRelay = n.hidden != nil
 	if n.catalog != nil {
 		st.CatalogVer = n.catalog.Version
 	}

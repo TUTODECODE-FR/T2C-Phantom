@@ -13,13 +13,17 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	mrand "math/rand/v2"
+	"slices"
 	"sync"
 	"time"
 
 	"t2c/pkg/onion"
 	"t2c/pkg/peerid"
+	"t2c/pkg/trust"
 	"t2c/pkg/wire"
 )
 
@@ -38,8 +42,9 @@ type circuit struct {
 	id   uint64
 	mu   sync.Mutex
 	hops []*onion.Hop
-	anon *peerid.Identity // pseudonyme jetable du circuit
-	ctl  chan []byte      // réponses de construction (créé / étendu)
+	keys []ed25519.PublicKey // relais du circuit (entrée → sortie)
+	anon *peerid.Identity    // pseudonyme jetable du circuit
+	ctl  chan []byte         // réponses de construction (créé / étendu)
 	dead chan struct{}
 	once sync.Once
 	// sendMu : chiffrer puis envoyer d'un seul tenant (ordre des nonces).
@@ -127,13 +132,81 @@ func (c *Client) currentCircuit() *circuit {
 	return nil
 }
 
-// buildCircuit bâtit un circuit saut par saut (chaque saut négocie ses clés),
-// puis l'ouvre sous un pseudonyme jetable.
+// buildCircuit : circuit relais d'entrée → [relais bénévole au milieu] →
+// relais de sortie officiel. Le bénévole du milieu ne voit ni l'adresse du
+// client (relais d'entrée) ni ce qui est demandé (relais de sortie). S'il ne
+// répond pas, circuit sans lui.
 func (c *Client) buildCircuit(ctx context.Context) (*circuit, error) {
 	hopsKeys := path(c.opt.EntryKey, c.opt.Relays)
 	if len(hopsKeys) < 2 {
 		return nil, ErrNoCircuit
 	}
+	if v := c.pickVolunteer(ctx, hopsKeys); v != nil {
+		withMiddle := []ed25519.PublicKey{hopsKeys[0], v, hopsKeys[len(hopsKeys)-1]}
+		if ci, err := c.buildPath(ctx, withMiddle); err == nil {
+			return ci, nil
+		}
+		c.badVolunteer(v)
+	}
+	return c.buildPath(ctx, hopsKeys)
+}
+
+// volunteers : relais bénévoles annoncés par le relais d'entrée (liste signée
+// par lui, revérifiée ; mise en cache 2 minutes).
+func (c *Client) volunteers(ctx context.Context) []ed25519.PublicKey {
+	c.mu.Lock()
+	if time.Since(c.volAt) < 2*time.Minute {
+		v := c.vols
+		c.mu.Unlock()
+		return v
+	}
+	c.mu.Unlock()
+	var out []ed25519.PublicKey
+	vctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	if b, err := c.get(vctx, wire.KindVolunteers, "", 0); err == nil {
+		var vl trust.VolunteerList
+		if json.Unmarshal(b, &vl) == nil && vl.Relay == hex.EncodeToString(c.opt.EntryKey) &&
+			vl.Verify(c.opt.EntryKey, time.Now()) == nil {
+			for _, k := range vl.Volunteers {
+				if pk, err := trust.ParsePublicKey(k); err == nil {
+					out = append(out, pk)
+				}
+			}
+		}
+	}
+	c.mu.Lock()
+	c.vols, c.volAt = out, time.Now()
+	c.mu.Unlock()
+	return out
+}
+
+func (c *Client) pickVolunteer(ctx context.Context, official []ed25519.PublicKey) ed25519.PublicKey {
+	vs := c.volunteers(ctx)
+	mrand.Shuffle(len(vs), func(i, j int) { vs[i], vs[j] = vs[j], vs[i] })
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, v := range vs {
+		if v.Equal(c.opt.AvoidRelay) || c.volBad[hex.EncodeToString(v)].After(time.Now()) || slices.ContainsFunc(official, func(k ed25519.PublicKey) bool { return k.Equal(v) }) {
+			continue
+		}
+		return v
+	}
+	return nil
+}
+
+func (c *Client) badVolunteer(v ed25519.PublicKey) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.volBad == nil {
+		c.volBad = map[string]time.Time{}
+	}
+	c.volBad[hex.EncodeToString(v)] = time.Now().Add(30 * time.Minute)
+}
+
+// buildPath bâtit un circuit saut par saut (chaque saut négocie ses clés),
+// puis l'ouvre sous un pseudonyme jetable.
+func (c *Client) buildPath(ctx context.Context, hopsKeys []ed25519.PublicKey) (*circuit, error) {
 	var idb [8]byte
 	_, _ = rand.Read(idb[:])
 	ci := &circuit{id: binary.BigEndian.Uint64(idb[:]) | 1, ctl: make(chan []byte, 1), dead: make(chan struct{})}
@@ -179,6 +252,7 @@ func (c *Client) buildCircuit(ctx context.Context) (*circuit, error) {
 		return fail(err)
 	}
 	ci.hops = []*onion.Hop{hop}
+	ci.keys = hopsKeys
 
 	for _, k := range hopsKeys[1:] {
 		hs, err := onion.NewClient(k)
@@ -336,6 +410,14 @@ func (c *Client) e2eIdentity() (*peerid.Identity, error) {
 		return nil, ErrNoCircuit
 	}
 	return ci.anon, nil
+}
+
+// CircuitKeys : clés des relais du circuit actif, de l'entrée à la sortie.
+func (c *Client) CircuitKeys() []ed25519.PublicKey {
+	if ci := c.currentCircuit(); ci != nil {
+		return ci.keys
+	}
+	return nil
 }
 
 // Anonymous : vrai si les demandes passent par un circuit actif.
