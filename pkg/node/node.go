@@ -94,6 +94,7 @@ type Node struct {
 	catalogAt time.Time
 	peers     map[string]PeerInfo
 	fetching  map[string]*sync.Mutex // racine → verrou (pas deux téléchargements du même site)
+	lazy      map[string]*lazySite   // racine → site lu à la demande
 	stats     struct{ peers, origin, bad int64 }
 	hosting   Hosting
 	relay     string // relais actuellement utilisé
@@ -135,6 +136,7 @@ func Start(ctx context.Context, cfg Config) (*Node, error) {
 		connected: make(chan struct{}),
 		peers:     map[string]PeerInfo{},
 		fetching:  map[string]*sync.Mutex{},
+		lazy:      map[string]*lazySite{},
 		done:      make(chan struct{}),
 	}
 	n.loadTickets()

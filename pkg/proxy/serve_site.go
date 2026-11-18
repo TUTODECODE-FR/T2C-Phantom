@@ -2,12 +2,15 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
 	"time"
+
+	"t2c/pkg/trust"
 )
 
 // serveSite : sert le site .t2c depuis le dossier local (téléchargé chez les
@@ -19,9 +22,23 @@ func (s *Server) serveSite(w http.ResponseWriter, req *http.Request, domain stri
 		http.Error(w, "méthode non autorisée", http.StatusMethodNotAllowed)
 		return
 	}
+	if req.URL.Path == SitesPath {
+		s.serveSitesList(w, req)
+		return
+	}
 	ctx, cancel := context.WithTimeout(req.Context(), 5*time.Minute)
 	defer cancel()
-	dir, e, err := s.Node.SiteDir(ctx, domain)
+	var hfs http.FileSystem
+	var e *trust.SiteEntry
+	var err error
+	if lz, ok := s.Node.(lazySites); ok {
+		// chargement à la demande : seulement les morceaux de la page demandée
+		hfs, e, err = lz.SiteFS(ctx, domain)
+	} else {
+		var dir string
+		dir, e, err = s.Node.SiteDir(ctx, domain)
+		hfs = http.Dir(dir)
+	}
 	if err != nil {
 		http.Error(w, "Site inaccessible : "+err.Error(), http.StatusBadGateway)
 		fmt.Println("site", domain, ":", err)
@@ -30,7 +47,7 @@ func (s *Server) serveSite(w http.ResponseWriter, req *http.Request, domain stri
 	w.Header().Set("X-T2C-Root", e.Root)
 	w.Header().Set("X-T2C-Verified", "manifest-signed")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	http.FileServer(siteFS{http.Dir(dir)}).ServeHTTP(w, req)
+	http.FileServer(siteFS{hfs}).ServeHTTP(w, req)
 }
 
 // siteFS : ne sert ni les fichiers cachés ou internes (« .t2c-ok »…), ni la
@@ -56,4 +73,56 @@ func (f siteFS) Open(name string) (http.File, error) {
 		idx.Close()
 	}
 	return file, nil
+}
+
+// SitesPath : liste des sites du catalogue signé, servie par l'application
+// elle-même sur chaque site .t2c (une page comme tutodecode.t2c peut ainsi
+// afficher tous les sites, à jour, sans rien demander au réseau en plus).
+const SitesPath = "/.well-known/t2c/sites.json"
+
+type lazySites interface {
+	SiteFS(ctx context.Context, domain string) (http.FileSystem, *trust.SiteEntry, error)
+}
+
+type catalogSource interface {
+	Catalog(ctx context.Context) (*trust.Catalog, error)
+}
+
+type siteInfo struct {
+	ID        string `json:"id"`
+	Address   string `json:"address"`
+	Title     string `json:"title"`
+	Publisher string `json:"publisher,omitempty"`
+	Size      int64  `json:"size"`
+}
+
+func (s *Server) serveSitesList(w http.ResponseWriter, req *http.Request) {
+	src, ok := s.Node.(catalogSource)
+	if !ok {
+		http.NotFound(w, req)
+		return
+	}
+	ctx, cancel := context.WithTimeout(req.Context(), 15*time.Second)
+	defer cancel()
+	cat, err := src.Catalog(ctx)
+	if err != nil {
+		http.Error(w, "catalogue indisponible", http.StatusBadGateway)
+		return
+	}
+	out := struct {
+		Version uint64     `json:"version"`
+		Sites   []siteInfo `json:"sites"`
+	}{Version: cat.Version, Sites: []siteInfo{}}
+	for _, e := range cat.Sites {
+		a := e.Alias
+		if a == "" {
+			a = e.ID
+		}
+		out.Sites = append(out.Sites, siteInfo{ID: e.ID, Address: a + ".t2c", Title: e.Title, Publisher: e.Publisher, Size: e.Size})
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-T2C-Verified", "catalog-signed")
+	_ = json.NewEncoder(w).Encode(out)
 }
