@@ -1,0 +1,11 @@
+#!/bin/sh
+# Avant tout envoi d'une branche (GitHub, GitLab…) : vérification complète sur
+# ce PC (CI locale + pentest). En cas d'erreur, rien n'est envoyé et une
+# notification propose d'ouvrir le rapport dans Claude.
+# (contournement exceptionnel : git push --no-verify)
+while read -r lref _ _ _; do
+	case "$lref" in
+	refs/heads/*) exec sh "$(git rev-parse --show-toplevel)/scripts/verif-avant-envoi.sh" ;;
+	esac
+done
+exit 0  # étiquette seule (release) : la vérification a eu lieu au push du commit

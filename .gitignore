@@ -48,3 +48,9 @@ desktop/frontend/
 keep_t2c_alive.sh
 start_t2c.sh
 *.log
+
+# CI locale
+/.ci-local/
+
+# Fiche privée Claude (jamais publiée)
+CLAUDE.local.md
