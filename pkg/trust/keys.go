@@ -66,7 +66,8 @@ func GenerateKey(path string) (ed25519.PublicKey, error) {
 	return pub, nil
 }
 
-// LoadPrivateKey lit une graine hex écrite par GenerateKey.
+// LoadPrivateKey lit une graine hex écrite par GenerateKey, ou une clé chiffrée
+// (EncryptKeyFile) en demandant sa phrase de passe (Passphrase).
 func LoadPrivateKey(path string) (ed25519.PrivateKey, error) {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -78,6 +79,17 @@ func LoadPrivateKey(path string) (ed25519.PrivateKey, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
+	}
+	if IsEncryptedKey(data) {
+		pass, err := Passphrase(path)
+		if err != nil {
+			return nil, err
+		}
+		seed, err := decryptSeed(data, pass)
+		if err != nil {
+			return nil, err
+		}
+		return ed25519.NewKeyFromSeed(seed), nil
 	}
 	seed, err := hex.DecodeString(strings.TrimSpace(string(data)))
 	if err != nil || len(seed) != ed25519.SeedSize {
