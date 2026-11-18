@@ -73,6 +73,7 @@ type Client struct {
 	vols      []volRelay // relais bénévoles annoncés par le relais d'entrée
 	volAt     time.Time
 	volBad    map[string]time.Time // bénévoles qui n'ont pas répondu (évités 30 min)
+	policy    *trust.NetworkPolicy // consignes réseau du dernier catalogue vérifié
 }
 
 type outSession struct {
@@ -304,6 +305,14 @@ func (c *Client) Catalog(ctx context.Context) (*trust.Catalog, error) {
 		if err := c.guard.Accept("relays", cat.Relays.Version); err != nil {
 			return nil, err
 		}
+	}
+	if cat.Policy != nil {
+		if err := c.guard.Accept("policy", cat.Policy.Version); err != nil {
+			return nil, err
+		}
+		c.mu.Lock()
+		c.policy = cat.Policy
+		c.mu.Unlock()
 	}
 	for _, h := range cat.Heads { // tête de site plus ancienne que la dernière vue : refusée
 		if err := c.guard.Accept("head:"+h.Site, uint64(h.Issued)); err != nil {

@@ -71,8 +71,16 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 	want := !n.cfg.NoHiddenRelay && h.relayOn() && len(official) > 0
 	n.mu.Lock()
 	cur := n.hidden
+	if cur != nil {
+		// consignes réseau vues par le relais caché, gardées entre deux relances
+		// (sinon le plafond oscillerait à chaque redémarrage)
+		if p := cur.b.Policy(); p != nil {
+			n.relayPolicy = p
+		}
+	}
+	kbs := n.relayPolicy.RelayKBs(h.RelayKBs) // les consignes ne peuvent que baisser le plafond
 	n.mu.Unlock()
-	if cur != nil && (!want || !slices.Equal(cur.official, official) || cur.kbs != h.RelayKBs || cur.exit != h.relayExitOn()) {
+	if cur != nil && (!want || !slices.Equal(cur.official, official) || cur.kbs != kbs || cur.exit != h.relayExitOn()) {
 		n.stopHiddenRelay()
 		cur = nil
 	}
@@ -85,7 +93,7 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 		return
 	}
 	b := broker.New(broker.Config{RootKey: n.cfg.RootKey, MintBits: n.cfg.MintBits,
-		GlobalBytesPerSec: float64(h.RelayKBs) * 1024}, broker.NewMeshOrigin())
+		GlobalBytesPerSec: float64(kbs) * 1024}, broker.NewMeshOrigin())
 	if err := b.EnableMesh(broker.MeshConfig{Key: id.Priv, Volunteer: true, Mint: id.MintNonce, MintBits: id.MintBits,
 		VolunteerExit: h.relayExitOn(), Official: official, Every: n.hiddenEvery(), MaxCircuits: 64}); err != nil {
 		n.setErr(err)
@@ -94,7 +102,7 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 	rctx, cancel := context.WithCancel(ctx)
 	go b.RunMesh(rctx)
 	n.mu.Lock()
-	n.hidden = &hiddenRelay{b: b, cancel: cancel, official: official, kbs: h.RelayKBs, exit: h.relayExitOn()}
+	n.hidden = &hiddenRelay{b: b, cancel: cancel, official: official, kbs: kbs, exit: h.relayExitOn()}
 	n.mu.Unlock()
 }
 

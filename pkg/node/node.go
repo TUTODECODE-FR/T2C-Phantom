@@ -93,23 +93,24 @@ type Node struct {
 	store *peerclient.ContentStore
 	guard *trust.VersionGuard
 
-	mu        sync.Mutex
-	client    *peerclient.Client
-	connected chan struct{} // fermé quand une connexion est prête
-	lastErr   string
-	tickets   []trust.Ticket
-	catalog   *trust.Catalog
-	catalogAt time.Time
-	peers     map[string]PeerInfo
-	fetching  map[string]*sync.Mutex // racine → verrou (pas deux téléchargements du même site)
-	lazy      map[string]*lazySite   // racine → site lu à la demande
-	hidden    *hiddenRelay           // relais caché bénévole (nil = arrêté)
-	relayID   *peerid.Identity       // identité du relais caché (distincte de id)
-	relayIDMu sync.Mutex
-	stats     struct{ peers, origin, bad int64 }
-	hosting   Hosting
-	relay     string // relais actuellement utilisé
-	recMu     sync.Mutex
+	mu          sync.Mutex
+	client      *peerclient.Client
+	connected   chan struct{} // fermé quand une connexion est prête
+	lastErr     string
+	tickets     []trust.Ticket
+	catalog     *trust.Catalog
+	catalogAt   time.Time
+	peers       map[string]PeerInfo
+	fetching    map[string]*sync.Mutex // racine → verrou (pas deux téléchargements du même site)
+	lazy        map[string]*lazySite   // racine → site lu à la demande
+	hidden      *hiddenRelay           // relais caché bénévole (nil = arrêté)
+	relayPolicy *trust.NetworkPolicy   // dernières consignes réseau vues par le relais caché
+	relayID     *peerid.Identity       // identité du relais caché (distincte de id)
+	relayIDMu   sync.Mutex
+	stats       struct{ peers, origin, bad int64 }
+	hosting     Hosting
+	relay       string // relais actuellement utilisé
+	recMu       sync.Mutex
 
 	cancel context.CancelFunc
 	done   chan struct{}

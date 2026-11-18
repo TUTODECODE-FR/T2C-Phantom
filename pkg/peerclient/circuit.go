@@ -171,6 +171,12 @@ func (c *Client) buildCircuit(ctx context.Context) (*circuit, error) {
 		return nil, ErrNoCircuit
 	}
 	entry, exitOfficial := official[0], official[len(official)-1]
+	c.mu.Lock()
+	share := c.policy.VolunteerShare()
+	c.mu.Unlock()
+	if share < 100 && mrand.IntN(100) >= share { // consignes : ce circuit reste sur les officiels
+		return c.buildPath(ctx, official)
+	}
 	vs := c.usableVolunteers(ctx, official)
 	now := time.Now()
 	try := func(keys []ed25519.PublicKey, vols ...volRelay) (*circuit, bool) {
@@ -266,7 +272,8 @@ func (c *Client) usableVolunteers(ctx context.Context, official []ed25519.Public
 	defer c.mu.Unlock()
 	var out []volRelay
 	for _, v := range vs {
-		if v.key.Equal(c.opt.AvoidRelay) || c.volBad[hex.EncodeToString(v.key)].After(time.Now()) ||
+		k := hex.EncodeToString(v.key)
+		if v.key.Equal(c.opt.AvoidRelay) || c.volBad[k].After(time.Now()) || c.policy.Banned(k) ||
 			slices.ContainsFunc(official, func(k ed25519.PublicKey) bool { return k.Equal(v.key) }) {
 			continue
 		}

@@ -43,6 +43,9 @@ type Catalog struct {
 	// Relays : relais officiels signés par la racine (hors signature du
 	// catalogue, voir RelayList). Mis à nil par Verify s'il est invalide.
 	Relays *RelayList `json:"relays,omitempty"`
+	// Policy : consignes réseau (hors signature du catalogue, voir
+	// NetworkPolicy). Mises à nil par Verify si invalides ou expirées.
+	Policy *NetworkPolicy `json:"policy,omitempty"`
 	base   []SiteEntry
 }
 
@@ -117,7 +120,7 @@ func verify(pub ed25519.PublicKey, domain string, unsigned any, sigHex string) e
 func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
 	c.base = nil
 	u := *c
-	u.Sig, u.Heads, u.Relays = "", nil, nil
+	u.Sig, u.Heads, u.Relays, u.Policy = "", nil, nil, nil
 	s, err := sign(priv, domCatalog, u)
 	c.Sig = s
 	return err
@@ -125,7 +128,7 @@ func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
 
 func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	u := *c
-	u.Sig, u.Heads, u.Relays, u.base = "", nil, nil, nil
+	u.Sig, u.Heads, u.Relays, u.Policy, u.base = "", nil, nil, nil, nil
 	u.Sites = c.Base()
 	if err := verify(pub, domCatalog, u, c.Sig); err != nil {
 		return err
@@ -142,6 +145,9 @@ func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	c.applyHeads(pub)
 	if c.Relays != nil && c.Relays.Verify(pub) != nil {
 		c.Relays = nil // liste invalide : ignorée, jamais utilisée
+	}
+	if c.Policy != nil && c.Policy.Verify(pub, time.Now()) != nil {
+		c.Policy = nil // consignes invalides ou expirées : ignorées
 	}
 	return nil
 }
