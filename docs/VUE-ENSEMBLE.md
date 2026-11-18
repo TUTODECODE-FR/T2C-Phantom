@@ -224,13 +224,24 @@ Un argument que Tor n'a pas : **un relais T2C ne transporte que du contenu sign�
 - Sa clé n'a **aucun lien** avec l'identité du membre, et elle n'est jamais utilisée dans ses propres circuits.
 - L'annuaire des relais cachés est signé par chaque relais officiel, pas par le serveur.
 
-### 8.3 Ce qui arrive ensuite (testé en interne, publié avec le domaine `t2cphantom.eu.org`)
+### 8.3 Des circuits choisis comme Tor (en place, testé en interne)
 
-1. **Les relais bénévoles en sortie de circuit**, avec des règles à la Tor : jamais deux relais du même réseau dans un circuit, un nouveau relais très peu utilisé au début puis de plus en plus sur plusieurs semaines (espionner coûterait des centaines de serveurs pendant des mois), et deux modes dans l'application, « Partagé » (par défaut) et « Maximal » (au moins un relais de l'association). C'est cette étape qui soulage vraiment les relais de l'association.
-2. **Les relais d'entrée volontaires**, en un clic dans l'application : « ma propre adresse » (l'application vérifie qu'elle est joignable et explique comment ouvrir le port) ou « un VPN avec redirection de port » (guide pas à pas, vérification automatique). Et pour ceux qui ont un serveur : `t2c-relay` en une commande.
-3. **Cloudflare devant le relais principal** : il ne voit plus les adresses IP des membres.
+- Un relais bénévole peut aussi accepter d'être la **sortie** des circuits (réglage dans l'application, activé par défaut). Il voit alors les demandes, sous un pseudonyme jetable, jamais l'adresse du membre, connue du seul relais d'entrée de l'association.
+- **Jamais deux relais du même réseau** dans un circuit : chaque relais officiel publie, pour chaque bénévole, une « famille » (empreinte salée de son réseau, renouvelée chaque jour), jamais son adresse.
+- **Montée progressive** : un relais n'est proposé qu'après 24 heures, puis choisi de plus en plus souvent pendant 14 jours. Une armée de relais créés d'un coup ne pèse presque rien.
+- Deux modes dans l'application :
 
-### 8.4 Mises à jour : automatiques, signées, progressives
+| Mode | Circuit | Effet |
+|---|---|---|
+| **Partagé** (par défaut) | entrée de l'association → bénévole → bénévole d'une autre famille en sortie | **aucun relais de l'association ne voit plus ce qui est demandé** ; anonymat comme Tor |
+| **Maximal** | entrée de l'association → bénévole → sortie de l'association | l'anonymat repose sur les relais de l'association |
+
+### 8.4 Ce qui arrive ensuite (testé en interne, publié avec le domaine `t2cphantom.eu.org`)
+
+1. **Les relais d'entrée volontaires**, en un clic dans l'application : « ma propre adresse » (l'application vérifie qu'elle est joignable et explique comment ouvrir le port) ou « un VPN avec redirection de port » (guide pas à pas, vérification automatique). Et pour ceux qui ont un serveur : `t2c-relay` en une commande. **C'est l'étape qui soulage vraiment les relais de l'association**, puisque les membres entrent aussi par eux.
+2. **Cloudflare devant le relais principal** : il ne voit plus les adresses IP des membres.
+
+### 8.5 Mises à jour : automatiques, signées, progressives
 
 - **Les relais se mettent à jour tout seuls** : chaque nouvelle version est publiée sur le réseau lui-même (site `relais.t2c`), **signée par une clé dédiée** de l'association, hors ligne. Un relais refuse toute version non signée ou plus ancienne que la sienne. Le déploiement est progressif : quelques relais d'abord, puis tous s'ils restent en bonne santé.
 - **Les applications** reçoivent par le réseau un avis de version signé par TUTODECODE :
@@ -239,7 +250,7 @@ Un argument que Tor n'a pas : **un relais T2C ne transporte que du contenu sign�
   - si une faille met **les autres membres** en danger, l'avis fixe une **version minimale** : en dessous, les relais refusent l'application, qui explique pourquoi et comment se mettre à jour.
 - Les relais bénévoles peuvent choisir « mises à jour automatiques » (par défaut) ou « me prévenir seulement ». Le code est public, et chaque version peut être reconstruite à l'identique pour vérifier qu'elle correspond au code.
 
-### 8.5 Au bout du chantier
+### 8.6 Au bout du chantier
 
 T2C Phantom sera **un réseau de diffusion du savoir de TUTODECODE porté par ses membres** :
 
