@@ -132,3 +132,36 @@ func TestDelegatedManifest(t *testing.T) {
 		t.Fatal("manifeste d'un site non confié accepté")
 	}
 }
+
+func TestRelayList(t *testing.T) {
+	root, rootPriv, svc, d, cat := headFixture(t)
+	_ = d
+	good := &RelayList{Version: 2, Issued: 1, Relays: []string{"wss://a.example/v1/ws#k=" + strings.Repeat("1", 64), "hidden:r2#k=" + strings.Repeat("2", 64)}}
+	if err := good.Sign(rootPriv); err != nil {
+		t.Fatal(err)
+	}
+	c := reload(t, cat)
+	c.Relays = good
+	c = reload(t, c)
+	if err := c.Verify(root); err != nil || c.Relays == nil || len(c.Relays.Relays) != 2 {
+		t.Fatalf("liste valide refusée: %v", err)
+	}
+	// signée par une clé déléguée (serveur), modifiée, ou entrée étrange : ignorée
+	bySvc := *good
+	_ = bySvc.Sign(svc)
+	tampered := *good
+	tampered.Relays = append([]string{"wss://espion.example/v1/ws#k=" + strings.Repeat("3", 64)}, good.Relays...)
+	weird := &RelayList{Version: 3, Relays: []string{"http://x"}}
+	_ = weird.Sign(rootPriv)
+	for i, r := range []*RelayList{&bySvc, &tampered, weird} {
+		c := reload(t, cat)
+		c.Relays = r
+		c = reload(t, c)
+		if err := c.Verify(root); err != nil {
+			t.Fatalf("%d: catalogue refusé: %v", i, err)
+		}
+		if c.Relays != nil {
+			t.Fatalf("%d: liste de relais non fiable acceptée", i)
+		}
+	}
+}

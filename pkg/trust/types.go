@@ -40,7 +40,10 @@ type Catalog struct {
 	// Heads : têtes de site (hors signature racine, chacune signée par sa clé
 	// déléguée). Appliquées par Verify ; Sites devient alors la vue effective.
 	Heads []SiteHead `json:"heads,omitempty"`
-	base  []SiteEntry
+	// Relays : relais officiels signés par la racine (hors signature du
+	// catalogue, voir RelayList). Mis à nil par Verify s'il est invalide.
+	Relays *RelayList `json:"relays,omitempty"`
+	base   []SiteEntry
 }
 
 // HostEntry : un bénévole approuvé. Pas d'IP : seulement l'ID de pair libp2p,
@@ -114,7 +117,7 @@ func verify(pub ed25519.PublicKey, domain string, unsigned any, sigHex string) e
 func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
 	c.base = nil
 	u := *c
-	u.Sig, u.Heads = "", nil
+	u.Sig, u.Heads, u.Relays = "", nil, nil
 	s, err := sign(priv, domCatalog, u)
 	c.Sig = s
 	return err
@@ -122,7 +125,7 @@ func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
 
 func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	u := *c
-	u.Sig, u.Heads, u.base = "", nil, nil
+	u.Sig, u.Heads, u.Relays, u.base = "", nil, nil, nil
 	u.Sites = c.Base()
 	if err := verify(pub, domCatalog, u, c.Sig); err != nil {
 		return err
@@ -137,6 +140,9 @@ func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	}
 	c.Sites = slices.Clone(c.base)
 	c.applyHeads(pub)
+	if c.Relays != nil && c.Relays.Verify(pub) != nil {
+		c.Relays = nil // liste invalide : ignorée, jamais utilisée
+	}
 	return nil
 }
 

@@ -291,6 +291,11 @@ func (c *Client) Catalog(ctx context.Context) (*trust.Catalog, error) {
 	if err := c.guard.Accept("catalog", cat.Version); err != nil {
 		return nil, err
 	}
+	if cat.Relays != nil {
+		if err := c.guard.Accept("relays", cat.Relays.Version); err != nil {
+			return nil, err
+		}
+	}
 	for _, h := range cat.Heads { // tête de site plus ancienne que la dernière vue : refusée
 		if err := c.guard.Accept("head:"+h.Site, uint64(h.Issued)); err != nil {
 			return nil, err
@@ -572,16 +577,7 @@ func (c *Client) Fetch(ctx context.Context, root string) ([]byte, *trust.Manifes
 		data, err := c.opt.Store.Read(root)
 		return data, m, st, err
 	}
-	hosts, _ := c.Find(ctx, root)
-	if hl, err := c.Hosts(ctx); err == nil && hl != nil {
-		kept := hosts[:0]
-		for _, h := range hosts {
-			if !hl.IsBanned(h.Peer) {
-				kept = append(kept, h)
-			}
-		}
-		hosts = kept
-	}
+	hosts := c.Peers(ctx, root)
 
 	out := make([]byte, m.Size)
 	idx := make(chan int)
@@ -614,6 +610,56 @@ func (c *Client) Fetch(ctx context.Context, root string) ([]byte, *trust.Manifes
 		return nil, nil, st, err
 	}
 	return out, m, st, ctx.Err()
+}
+
+// Peers : bénévoles annoncés pour root (bannis exclus).
+func (c *Client) Peers(ctx context.Context, root string) []wire.HostInfo {
+	hosts, _ := c.Find(ctx, root)
+	if hl, err := c.Hosts(ctx); err == nil && hl != nil {
+		kept := hosts[:0]
+		for _, h := range hosts {
+			if !hl.IsBanned(h.Peer) {
+				kept = append(kept, h)
+			}
+		}
+		hosts = kept
+	}
+	return hosts
+}
+
+// FetchChunks : seulement les morceaux idx (chargement à la demande d'un
+// fichier du site), chacun vérifié contre le manifeste signé.
+func (c *Client) FetchChunks(ctx context.Context, m *trust.Manifest, idx []int, hosts []wire.HostInfo, st *FetchStats) (map[int][]byte, error) {
+	out := make(map[int][]byte, len(idx))
+	var mu sync.Mutex
+	var firstErr error
+	sem := make(chan struct{}, max(1, c.opt.Workers))
+	var wg sync.WaitGroup
+	for _, i := range idx {
+		if i < 0 || i >= len(m.Chunks) {
+			return nil, fmt.Errorf("morceau %d hors limites", i)
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer func() { <-sem; wg.Done() }()
+			data, err := c.fetchChunk(ctx, m, i, hosts, st)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("morceau %d: %w", i, err)
+				}
+				return
+			}
+			out[i] = data
+		}(i)
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return out, ctx.Err()
 }
 
 func (c *Client) fetchChunk(ctx context.Context, m *trust.Manifest, i int, hosts []wire.HostInfo, st *FetchStats) ([]byte, error) {

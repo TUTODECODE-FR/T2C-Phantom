@@ -280,24 +280,25 @@ func (n *Node) upgradeToAnonymous(c *peerclient.Client) {
 	}
 }
 
-// learnRelays retient les relais publiés dans la liste signée hosts.json.
+// learnRelays retient les relais officiels : uniquement la liste signée par la
+// clé racine (catalogue), jamais celle du serveur (hosts.json). Un serveur
+// piraté ne peut donc pas glisser de relais espions dans les circuits.
 func (n *Node) learnRelays(ctx context.Context, c *peerclient.Client) bool {
 	hctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	hl, err := c.Hosts(hctx)
+	cat, err := c.Catalog(hctx)
 	if err != nil {
 		return false
 	}
-	if len(hl.Bootstrap) == 0 {
-		return true
-	}
 	var urls []string
-	for _, u := range hl.Bootstrap { // « url#k=clé » : la clé sert aux circuits anonymes
-		base, _, _ := strings.Cut(u, "#")
-		// relais caché (« hidden:nom#k=clé ») : jamais contacté, seulement utilisé dans les circuits
-		usable := validRelay(base) || (strings.HasPrefix(base, "hidden:") && strings.Contains(u, "#k="))
-		if usable && len(urls) < 16 && !slices.Contains(urls, u) {
-			urls = append(urls, u)
+	if cat.Relays != nil {
+		for _, u := range cat.Relays.Relays { // « url#k=clé » : la clé sert aux circuits anonymes
+			base, _, _ := strings.Cut(u, "#")
+			// relais caché (« hidden:nom#k=clé ») : jamais contacté, seulement utilisé dans les circuits
+			usable := validRelay(base) || (strings.HasPrefix(base, "hidden:") && strings.Contains(u, "#k="))
+			if usable && len(urls) < 16 && !slices.Contains(urls, u) {
+				urls = append(urls, u)
+			}
 		}
 	}
 	b, _ := json.Marshal(urls)
