@@ -45,7 +45,8 @@ Trois promesses, qui ne dépendent pas de la bonne foi des machines du réseau :
 |---|---|---|
 | **Poste de l'éditeur** | crée et signe tout ce qui fait foi | la **clé racine**, chiffrée par phrase de passe, jamais en ligne |
 | **Serveur d'origine** | stocke les sites, les distribue au réseau, tient le score des bénévoles | une clé de service limitée (liste des bénévoles, tickets) ; **aucune clé capable de signer un site** |
-| **Relais** | point d'entrée des utilisateurs, circuits anonymes, annuaire des bénévoles, fédération entre relais | sa propre clé ; **aucun contenu en clair**, aucune clé de publication |
+| **Relais officiels** | point d'entrée des utilisateurs, circuits anonymes, annuaire des bénévoles, fédération entre relais | sa propre clé ; **aucun contenu en clair**, aucune clé de publication |
+| **Relais cachés** (chaque application) | transportent les circuits des autres membres, au milieu, sans rien voir ; aucune adresse publiée | une clé de relais distincte de l'identité du membre |
 | **Bénévoles** | hébergent des copies chiffrées et servent des morceaux aux autres | des copies vérifiées des sites qu'ils ont choisis |
 | **Application T2C Phantom** | ouvre les sites `.t2c` dans ton navigateur, vérifie tout | ton identité pseudonyme (clé aléatoire) |
 | **T2DECODE** | application d'apprentissage ; peut recevoir les cours par T2C Phantom | la clé **publique** de TUTODECODE, pour vérifier `cours.tdc` |
@@ -57,7 +58,7 @@ Trois promesses, qui ne dépendent pas de la bonne foi des machines du réseau :
 | **T2C Phantom** (macOS, Windows, Linux) | tout le monde | application de bureau : assistant de premier lancement, carnet de sites, bénévolat, connexion/déconnexion |
 | **`t2c`** | serveurs, scripts | la même chose en ligne de commande (`t2c start`, `t2c doctor`…) |
 | **`t2c-peer`** | tests, bénévoles sans interface | un membre minimal du réseau |
-| **`t2c-relay`** | opérateurs de relais | le relais |
+| **`t2c-relay`** | ceux qui ont un serveur et veulent soutenir le réseau | le relais complet (dépôt séparé `T2C-Phantom-relay`, dont le cœur est aussi intégré à chaque application) |
 | **`t2c-serv`** | l'éditeur et le serveur d'origine | publier, signer, exporter/importer, servir |
 | **`t2c-forge`** | conteneurs de fabrication | fabrique `repo.t2c` à partir des dépôts de code |
 
@@ -123,7 +124,7 @@ Conséquence : **un serveur, un relais, un bénévole, un routeur ou un conteneu
 
 ### 4.4 Rester anonyme (routage en oignon)
 
-- Tes demandes traversent un **circuit** de plusieurs relais, chiffré une fois par relais. Chaque relais ne retire qu'une couche.
+- Tes demandes traversent un **circuit** de plusieurs relais, chiffré une fois par relais. Chaque relais ne retire qu'une couche. Quand c'est possible, le relais du **milieu** est le relais caché d'un autre membre : il ne voit ni qui tu es ni ce que tu demandes.
 - Le **relais d'entrée** voit ton adresse IP, mais pas ce que tu demandes.
 - Le **relais de sortie** voit ce qui est demandé, mais ni ton adresse ni ton identité : seulement un **pseudonyme jetable**, changé toutes les 10 minutes.
 - Contre l'analyse de trafic : cellules de **4 tailles fixes**, **trafic leurre** permanent, **délais aléatoires** à la sortie.
@@ -150,7 +151,7 @@ Conséquence : **un serveur, un relais, un bénévole, un routeur ou un conteneu
 | | Ton adresse IP | Ce que tu consultes | Le contenu des échanges entre membres |
 |---|---|---|---|
 | **Point d'entrée** (Cloudflare ou relais d'entrée) | oui | non en mode anonyme | non (chiffré) |
-| **Relais du milieu** | non | non | non |
+| **Relais du milieu** (souvent le relais caché d'un autre membre) | non | non | non |
 | **Relais de sortie** | non | oui, sous un pseudonyme jetable | non |
 | **Bénévoles** | non | seulement les morceaux qu'ils fournissent, à un pseudonyme | — |
 | **Serveur d'origine** | non | non | — |
@@ -163,6 +164,7 @@ Le nom `.t2c` ne circule jamais sur Internet : le proxy local l'intercepte, et l
 |---|---|---|
 | **Relais** | couper ou ralentir ; voir les adresses IP de ceux qui entrent par lui | faux contenu ; savoir **qui** lit **quoi** (il faudrait aussi la sortie du même circuit) |
 | **Bénévole** | envoyer de faux morceaux, aussitôt rejetés (il est banni) | modifier un site ; identifier qui demande |
+| **Relais caché d'un membre** | ralentir ou couper les circuits qui passent par lui (l'application en rebâtit un autre) | lire quoi que ce soit, savoir qui ou quoi : il n'est jamais ni entrée ni sortie |
 | **Serveur d'origine** | cesser de servir ; mal noter des bénévoles | signer un site, un cours ou une liste de relais |
 | **Conteneur de fabrication** | publier de fausses versions de **son seul site**, jusqu'à l'expiration de sa clé | toucher aux autres sites, au catalogue, aux relais |
 | **Routeur ou réseau** | couper | lire ou modifier (tout est chiffré et signé) |
@@ -195,61 +197,69 @@ D'où les protections de la clé racine : hors ligne, chiffrée, phrase de passe
 
 ---
 
-## 8. Ce que T2C Phantom deviendra (chantier en cours)
+## 8. Soutenir le réseau
 
-Testé en interne d'abord ; publié quand tout sera validé, avec le domaine `t2cphantom.eu.org`.
+### 8.1 Le principe : chaque membre soutient l'anonymat de tous
 
-### 8.1 Des relais bénévoles, comme Tor
+Sans bénévoles, le réseau repose sur les seuls relais de l'association : tout fonctionne, mais tout le trafic passe par eux, et l'anonymat repose sur un petit nombre de relais. **Chaque personne qui a T2C Phantom renforce le réseau**, à trois niveaux, tous automatiques :
 
-- **N'importe qui avec un serveur peut faire tourner un relais**, en une commande, sans rien demander à l'association.
-- Les relais **s'annoncent tout seuls**. Le réseau les teste automatiquement (joignables, protocole conforme, preuve de travail, 24 h en ligne), les inscrit dans un **annuaire automatique**, et les retire tout seuls s'ils tombent ou trichent.
-- Pour un bénévole chez lui : seulement derrière un VPN qui permet de recevoir des connexions (redirection de port) ou derrière son propre tunnel. Son adresse personnelle n'est jamais publiée.
-- Les relais de l'association restent dans la **liste signée par la clé racine** : c'est le socle de confiance.
+| Niveau | Qui | Ce que ça apporte | Ce que la personne risque |
+|---|---|---|---|
+| **Relais caché** | **chaque application**, activé par défaut (désactivable) | plus de relais différents dans les circuits : **la corrélation devient beaucoup plus difficile** | rien : ni adresse publiée, ni contenu lisible, débit plafonné (128 Ko/s par défaut) |
+| **Bénévole hébergeur** | ceux qui cochent des sites | les sites sont servis par les membres, plus vite, même si un serveur tombe | rien : copies chiffrées, seulement du contenu signé |
+| **Relais d'entrée** | ceux qui ont un serveur, ou un VPN qui laisse entrer les connexions | **soulage les relais de l'association** : les membres entrent aussi par eux | l'adresse du serveur ou du VPN est visible, jamais celle de leur domicile |
 
-### 8.2 Des circuits choisis comme Tor
+**Plus il y a de relais, mieux c'est pour tout le monde** :
+- les circuits passent par des relais de personnes différentes : pour espionner, il faudrait contrôler l'entrée **et** la sortie d'un même circuit, ce qui devient d'autant plus improbable qu'il y a de relais ;
+- le trafic se répartit : plus de goulot, plus de point unique à surcharger ou à couper ;
+- un relais qui tombe passe inaperçu : l'application en choisit un autre.
 
-- Jamais deux relais du même réseau dans un circuit.
-- Un nouveau relais n'est presque pas utilisé au début, puis de plus en plus sur plusieurs semaines. Espionner demanderait des centaines de serveurs pendant des mois.
-- Deux modes dans l'application :
+Un argument que Tor n'a pas : **un relais T2C ne transporte que du contenu signé par TUTODECODE**, jamais « tout Internet ». Soutenir le réseau ne fait courir aucun des risques juridiques d'un relais de sortie Tor.
 
-| Mode | Circuit | Effet |
-|---|---|---|
-| **Partagé** (par défaut) | relais bénévoles d'opérateurs différents | réseau rapide et sans goulot ; anonymat très fort, comme Tor |
-| **Maximal** | au moins un relais de l'association | anonymat appuyé sur les relais de l'association ; plus lent |
+### 8.2 Le relais caché de chaque application (déjà en place)
 
-Dans les deux modes, **personne ne peut modifier un contenu**.
+- L'application n'écoute rien et ne publie aucune adresse : c'est elle qui se connecte aux relais officiels.
+- Les relais officiels l'admettent **automatiquement** si sa clé a coûté une preuve de travail. Elle n'a que des droits réduits : transporter des cellules de circuit, rien d'autre (ni annuaire, ni accès au serveur, ni sortie).
+- Elle ne sert qu'au **milieu** des circuits : entrée officielle → relais caché → sortie officielle. Elle ne voit ni qui est le membre (connu du relais d'entrée) ni ce qu'il demande (relais de sortie).
+- Sa clé n'a **aucun lien** avec l'identité du membre, et elle n'est jamais utilisée dans ses propres circuits.
+- L'annuaire des relais cachés est signé par chaque relais officiel, pas par le serveur.
 
-Un argument que Tor n'a pas : **un relais T2C ne transporte que du contenu signé par TUTODECODE**, jamais « tout Internet ». Faire tourner un relais ne fait donc courir aucun des risques juridiques d'un relais de sortie Tor.
+### 8.3 Ce qui arrive ensuite (testé en interne, publié avec le domaine `t2cphantom.eu.org`)
 
-### 8.3 Cloudflare devant le relais principal
+1. **Les relais bénévoles en sortie de circuit**, avec des règles à la Tor : jamais deux relais du même réseau dans un circuit, un nouveau relais très peu utilisé au début puis de plus en plus sur plusieurs semaines (espionner coûterait des centaines de serveurs pendant des mois), et deux modes dans l'application, « Partagé » (par défaut) et « Maximal » (au moins un relais de l'association). C'est cette étape qui soulage vraiment les relais de l'association.
+2. **Les relais d'entrée volontaires**, en un clic dans l'application : « ma propre adresse » (l'application vérifie qu'elle est joignable et explique comment ouvrir le port) ou « un VPN avec redirection de port » (guide pas à pas, vérification automatique). Et pour ceux qui ont un serveur : `t2c-relay` en une commande.
+3. **Cloudflare devant le relais principal** : il ne voit plus les adresses IP des membres.
 
-- Les utilisateurs entrent par Cloudflare ; le relais principal ne voit plus leurs adresses IP.
-- Le relais refuse toute connexion qui ne vient pas de Cloudflare (certificat client).
-- Sans domaine : un Worker gratuit sur `workers.dev`. Avec `t2cphantom.eu.org` : directement sur le domaine.
+### 8.4 Mises à jour : automatiques, signées, progressives
 
-### 8.4 Au bout du chantier
+- **Les relais se mettent à jour tout seuls** : chaque nouvelle version est publiée sur le réseau lui-même (site `relais.t2c`), **signée par une clé dédiée** de l'association, hors ligne. Un relais refuse toute version non signée ou plus ancienne que la sienne. Le déploiement est progressif : quelques relais d'abord, puis tous s'ils restent en bonne santé.
+- **Les applications** reçoivent par le réseau un avis de version signé par TUTODECODE :
+  - une **mise à jour ordinaire** est simplement signalée : pas besoin d'avoir toujours la dernière version, tout continue de fonctionner ;
+  - une **mise à jour importante** (faille corrigée) est annoncée clairement, avec un bouton pour la télécharger ;
+  - si une faille met **les autres membres** en danger, l'avis fixe une **version minimale** : en dessous, les relais refusent l'application, qui explique pourquoi et comment se mettre à jour.
+- Les relais bénévoles peuvent choisir « mises à jour automatiques » (par défaut) ou « me prévenir seulement ». Le code est public, et chaque version peut être reconstruite à l'identique pour vérifier qu'elle correspond au code.
 
-T2C Phantom sera **un réseau de diffusion du savoir de TUTODECODE** :
+### 8.5 Au bout du chantier
 
-- **porté par ses membres** : bénévoles qui hébergent, relais bénévoles qui transportent ;
-- **sans point unique** à abattre ni à acheter ;
-- **inaltérable** : tout est signé par une seule clé, hors ligne ;
-- **anonyme par défaut** ;
-- avec ses propres sites (portail, cours, code source) et l'intégration directe des cours dans T2DECODE.
+T2C Phantom sera **un réseau de diffusion du savoir de TUTODECODE porté par ses membres** :
 
----
+- chaque application soutient l'anonymat de tous, les bénévoles hébergent, les relais volontaires transportent ;
+- **sans point unique** à abattre ni à acheter : si les relais de l'association tombent, ceux des membres prennent le relais ;
+- **inaltérable** : tout est signé par une clé unique, hors ligne ;
+- **anonyme par défaut**, et d'autant plus fort qu'il y a de membres ;
+- **à jour tout seul**, sans jamais accepter une version non signée.
 
 ## 9. Limites honnêtes
 
 - **Le point d'entrée voit ton adresse IP** (Cloudflare ou un relais), comme toute connexion. Pour que même lui ne la voie pas : un VPN ou Tor avant T2C Phantom.
-- **L'anonymat repose sur la diversité des relais** : un adversaire qui contrôlerait à la fois l'entrée et la sortie d'un circuit pourrait corréler. Les règles de choix des circuits rendent cela coûteux, pas impossible, comme pour Tor.
+- **L'anonymat repose sur la diversité des relais** : un adversaire qui contrôlerait à la fois l'entrée et la sortie d'un circuit pourrait corréler. Les relais cachés des membres et les règles de choix des circuits rendent cela de plus en plus coûteux à mesure que le réseau grandit, sans le rendre impossible, comme pour Tor.
+- **Le relais caché utilise un peu de débit** chez chaque membre (plafonné, désactivable).
 - **Tout maillon peut couper le service** ; seule la multiplication des relais et des bénévoles y répond.
 - **La clé racine est le point critique** : volée et cassée, elle permettrait de tout signer. Il n'existe pas encore de révocation : il faudrait publier de nouvelles applications.
 - **Plus lent qu'un site classique** au premier chargement : c'est le prix de l'anonymat et de la vérification.
 
 ## 10. Idées pour la suite
 
-- Mode « relais bénévole » activable en un clic dans l'application.
 - Releases signées par la clé racine, vérifiables depuis `tutodecode.t2c`.
 - Clé racine sur une clé physique (YubiKey) : impossible à copier.
 - Mise à jour des sites par différence : ne renvoyer que les morceaux modifiés.
@@ -268,6 +278,7 @@ T2C Phantom sera **un réseau de diffusion du savoir de TUTODECODE** :
 | **Manifeste** | la liste signée des empreintes des morceaux d'un site |
 | **Morceau** | bloc de 256 Ko d'un site, vérifiable seul |
 | **Relais** | machine qui fait entrer les membres dans le réseau et transporte les circuits |
+| **Relais caché** | relais intégré à chaque application : il transporte les circuits des autres au milieu, sans adresse publiée et sans rien voir |
 | **Circuit** | chemin chiffré en couches à travers plusieurs relais |
 | **Bénévole** | membre qui héberge des copies de sites |
 | **Pseudonyme jetable** | identité temporaire utilisée dans un circuit |
