@@ -122,3 +122,42 @@ func TestNetworkPolicy(t *testing.T) {
 		t.Fatal("consignes altérées non écartées du catalogue")
 	}
 }
+
+// Serveur piraté : la racine révoque sa clé de service ; ses consignes sont
+// écartées tout de suite, et l'anti-retour est tenu par signataire.
+func TestPolicyRevocation(t *testing.T) {
+	rootPub, rootPriv := keys(t)
+	svcPub, svcPriv := keys(t)
+	now := time.Now()
+	d, _ := NewDelegation(rootPriv, svcPub, time.Hour, ScopePolicy)
+	p := &NetworkPolicy{Version: 1 << 60, Issued: now.Unix(), Expires: now.Add(time.Hour).Unix(), Emergency: true}
+	_ = p.SignDelegated(svcPriv, d)
+	if p.Signer() != hex.EncodeToString(svcPub) {
+		t.Fatal("Signer")
+	}
+	mk := func(revoked ...string) *Catalog {
+		cat := &Catalog{Version: 1, Issued: now.Unix()}
+		_ = cat.Sign(rootPriv)
+		rl := &RelayList{Version: 1, Issued: now.Unix(), Relays: []string{"wss://a/v1/ws#k=00"}, Revoked: revoked}
+		_ = rl.Sign(rootPriv)
+		cat.Relays, cat.Policy = rl, p
+		raw, _ := json.Marshal(cat)
+		var got Catalog
+		_ = json.Unmarshal(raw, &got)
+		if err := got.Verify(rootPub); err != nil || got.Relays == nil {
+			t.Fatalf("catalogue: %v", err)
+		}
+		return &got
+	}
+	if mk().Policy == nil {
+		t.Fatal("consignes non révoquées écartées")
+	}
+	if mk(hex.EncodeToString(svcPub)).Policy != nil {
+		t.Fatal("consignes d'une clé révoquée acceptées")
+	}
+	bad := &RelayList{Version: 1, Relays: []string{"wss://a"}, Revoked: []string{"xx"}}
+	_ = bad.Sign(rootPriv)
+	if bad.Verify(rootPub) == nil {
+		t.Fatal("clé révoquée mal formée acceptée")
+	}
+}

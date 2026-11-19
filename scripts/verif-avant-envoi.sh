@@ -12,7 +12,7 @@ mkdir -p "$OUT"
 t0=$(date +%s)
 
 sh "$ROOT/scripts/ci-local.sh" "$@" 2>&1 | tee -a "$OUT/sortie.txt"
-[ -f "$PENTEST" ] && { echo; echo "== Pentest local"; sh "$PENTEST" 2>&1 | tee -a "$OUT/sortie.txt"; }
+[ -f "$PENTEST" ] && { echo; echo "== Pentest local"; FUZZTIME=${FUZZTIME:-5s} sh "$PENTEST" 2>&1 | tee -a "$OUT/sortie.txt"; }
 dur=$(($(date +%s) - t0))
 
 notify() { osascript -e "display notification \"$2\" with title \"T2C Phantom\" subtitle \"$1\"" 2>/dev/null || true; }

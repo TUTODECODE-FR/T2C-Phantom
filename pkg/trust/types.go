@@ -146,8 +146,8 @@ func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	if c.Relays != nil && c.Relays.Verify(pub) != nil {
 		c.Relays = nil // liste invalide : ignorée, jamais utilisée
 	}
-	if c.Policy != nil && c.Policy.Verify(pub, time.Now()) != nil {
-		c.Policy = nil // consignes invalides ou expirées : ignorées
+	if c.Policy != nil && (c.Policy.Verify(pub, time.Now()) != nil || c.Relays.revoked(c.Policy.Signer())) {
+		c.Policy = nil // consignes invalides, expirées ou d'une clé révoquée : ignorées
 	}
 	return nil
 }

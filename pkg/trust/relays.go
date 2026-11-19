@@ -2,6 +2,7 @@ package trust
 
 import (
 	"crypto/ed25519"
+	"encoding/hex"
 	"errors"
 	"strings"
 )
@@ -23,6 +24,10 @@ type RelayList struct {
 	Version uint64   `json:"version"` // strictement croissante (anti-retour arrière)
 	Issued  int64    `json:"issued"`
 	Relays  []string `json:"relays"` // « wss://hôte/v1/ws#k=<clé> » ou « hidden:nom#k=<clé> »
+	// Revoked : clés de service (hex) révoquées par la racine (serveur piraté) :
+	// leurs consignes réseau sont refusées immédiatement, sans attendre
+	// l'expiration de leur délégation.
+	Revoked []string `json:"revoked,omitempty"`
 	Sig     string   `json:"sig"`
 }
 
@@ -43,6 +48,14 @@ func (r *RelayList) Verify(root ed25519.PublicKey) error {
 		// ws:// n'est accepté par l'application que vers 127.0.0.1 (tests, banc local)
 		if len(e) > 512 || !(strings.HasPrefix(e, "wss://") || strings.HasPrefix(e, "ws://") || strings.HasPrefix(e, "hidden:")) {
 			return errors.New("trust: entrée de relais invalide")
+		}
+	}
+	if len(r.Revoked) > MaxRelays {
+		return errors.New("trust: trop de clés révoquées")
+	}
+	for _, k := range r.Revoked {
+		if b, err := hex.DecodeString(k); err != nil || len(b) != ed25519.PublicKeySize || k != hex.EncodeToString(b) {
+			return errors.New("trust: clé révoquée invalide")
 		}
 	}
 	u := *r

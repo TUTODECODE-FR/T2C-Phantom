@@ -307,7 +307,7 @@ func (c *Client) Catalog(ctx context.Context) (*trust.Catalog, error) {
 		}
 	}
 	if cat.Policy != nil {
-		if err := c.guard.Accept("policy", cat.Policy.Version); err != nil {
+		if err := c.guard.Accept("policy:"+cat.Policy.Signer(), cat.Policy.Version); err != nil {
 			return nil, err
 		}
 		c.mu.Lock()

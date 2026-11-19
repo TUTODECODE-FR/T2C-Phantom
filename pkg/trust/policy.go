@@ -91,6 +91,21 @@ func (p *NetworkPolicy) Verify(root ed25519.PublicKey, now time.Time) error {
 	return verify(k, domPolicy, u, p.Sig)
 }
 
+// Signer : clé qui a signé (hex de la clé de service, ou « root »). Sert à
+// l'anti-retour par signataire : une clé révoquée qui aurait publié une
+// version énorme ne bloque pas les consignes de la nouvelle clé.
+func (p *NetworkPolicy) Signer() string {
+	if p.Deleg == nil {
+		return "root"
+	}
+	return p.Deleg.Key
+}
+
+// revoked : la clé de service est révoquée par la liste racine.
+func (r *RelayList) revoked(key string) bool {
+	return r != nil && key != "root" && slices.Contains(r.Revoked, key)
+}
+
 // live : consignes encore valides (une copie en cache peut avoir expiré).
 // Toutes les méthodes ci-dessous acceptent un récepteur nil (aucune consigne).
 func (p *NetworkPolicy) live() bool {
