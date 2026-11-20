@@ -234,8 +234,12 @@ Un argument que Tor n'a pas : **un relais T2C ne transporte que du contenu sign�
 
 | Mode | Circuit | Effet |
 |---|---|---|
-| **Partagé** (par défaut) | entrée de l'association → bénévole → bénévole d'une autre famille en sortie | **aucun relais de l'association ne voit plus ce qui est demandé** ; anonymat comme Tor |
-| **Maximal** | entrée de l'association → bénévole → sortie de l'association | l'anonymat repose sur les relais de l'association |
+| **Partagé** (par défaut) | entrée de l'association ou **garde** bénévole → bénévole → bénévole d'une autre famille en sortie | la garde voit l'adresse IP, jamais ce qui est demandé ; la sortie voit les demandes, jamais l'adresse ; **aucun relais de l'association ne voit plus ce qui est demandé** |
+| **Maximal** | entrée de l'association (jamais un bénévole) → bénévole → sortie de l'association | seuls les relais de l'association voient l'adresse ou les demandes |
+
+- **Gardes d'entrée** (comme Tor) : un membre qui entre par un relais bénévole public (réglage « Entrer par des relais bénévoles (ils verront mon adresse IP) », activé par défaut en Partagé, jamais en Maximal ni pour un hébergeur) n'utilise qu'**une** garde, et un secours, choisies parmi les bénévoles présents depuis au moins 30 jours (ancienneté tenue par les relais officiels, remise à zéro après 48 h d'absence), gardées 60 jours ; changées seulement après des échecs répétés, une exclusion ou l'expiration. Identité jetable neuve à chaque connexion. L'annuaire des bénévoles est demandé par le circuit à une sortie officielle, jamais au relais d'entrée bénévole.
+- **Un relais caché ne se connecte jamais à un bénévole** : il ne prolonge un circuit que vers les relais officiels auxquels il est déjà relié ; seuls les bénévoles publics se joignent entre eux.
+- **Consignes en échec fermé** : quand une consigne expire, ses exclusions et son mode urgence restent appliqués (relais et applications) jusqu'à la suivante ; en urgence, les relais officiels refusent les bénévoles et les relais d'entrée bénévoles refusent les nouveaux membres.
 
 ### 8.4 Ce qui arrive ensuite (testé en interne, publié avec le domaine `t2cphantom.eu.org`)
 

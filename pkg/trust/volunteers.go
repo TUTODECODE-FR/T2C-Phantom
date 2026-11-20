@@ -3,6 +3,7 @@ package trust
 import (
 	"crypto/ed25519"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -34,7 +35,14 @@ type VolunteerEntry struct {
 	Family string `json:"family"`
 	Since  int64  `json:"since"`
 	Exit   bool   `json:"exit,omitempty"`
+	// URL : adresse publique (ws:// ou wss://hôte/v1/ws) d'un bénévole qui a
+	// choisi d'être aussi relais d'ENTRÉE ; publiée seulement après une sonde
+	// réussie du relais officiel (l'adresse répond bien avec cette clé).
+	URL string `json:"url,omitempty"`
 }
+
+// MaxVolunteerURL : longueur maximale d'une adresse publique de bénévole.
+const MaxVolunteerURL = 200
 
 func (v *VolunteerList) Sign(relay ed25519.PrivateKey) error {
 	u := *v
@@ -53,7 +61,8 @@ func (v *VolunteerList) Verify(relay ed25519.PublicKey, now time.Time) error {
 		if _, err := ParsePublicKey(e.Key); err != nil {
 			return err
 		}
-		if len(e.Family) > 32 || e.Since > now.Unix()+60 {
+		if len(e.Family) > 32 || e.Since > now.Unix()+60 || len(e.URL) > MaxVolunteerURL ||
+			e.URL != "" && !strings.HasPrefix(e.URL, "ws://") && !strings.HasPrefix(e.URL, "wss://") {
 			return errors.New("trust: entrée de bénévole invalide")
 		}
 	}

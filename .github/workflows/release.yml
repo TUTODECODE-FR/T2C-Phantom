@@ -151,7 +151,7 @@ jobs:
             mkdir -p "$out"
             for cmd in t2c t2c-peer; do
               CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
-                -ldflags "-s -w -X t2c/pkg/trust.RootPubKeyHex=${ROOT}" -o "$out/$cmd$ext" ./cmd/$cmd
+                -ldflags "-s -w -X t2c/pkg/buildinfo.Version=${TAG} -X t2c/pkg/trust.RootPubKeyHex=${ROOT}" -o "$out/$cmd$ext" ./cmd/$cmd
             done
             if [ "$os" = windows ]; then zip -qr "dist/$out.zip" "$out"; else tar czf "dist/$out.tar.gz" "$out"; fi
           done

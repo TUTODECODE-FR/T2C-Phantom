@@ -19,6 +19,11 @@
         <button class="btn ghost small" id="btnSettings" onclick="toggleSettings()" hidden>Réglages</button>
     </div>
 </header>
+<!-- avis de version signé par la racine : discret (available), visible (important), bloquant (obsolete) -->
+<div id="updateBanner" class="update-banner" hidden>
+    <span id="updateText"></span>
+    <button class="btn small" id="btnUpdate" onclick="openUpdate()" hidden>Télécharger la mise à jour</button>
+</div>
 
 <!-- ══ ASSISTANT DU PREMIER LANCEMENT ═══════════════════════════════ -->
 <main id="wizard" class="view" hidden>
@@ -105,15 +110,19 @@
         <p class="muted small-text">Héberge une copie de certains sites pour aider le réseau. Tes copies sont <strong>chiffrées sur ton disque</strong> et revérifiées à chaque envoi : une copie altérée n'est jamais servie. Les autres membres ne voient que ta clé pseudonyme.</p>
         <div class="relay-box">
             <label class="check"><input type="checkbox" id="chkRelay" onchange="saveHosting(!$('chkHost').checked)"> <strong>Relais caché</strong> : aider l'anonymat du réseau</label>
-            <p class="muted small-text">Ton application transporte des cellules chiffrées pour les autres membres, au milieu de leurs circuits. Elle ne voit ni qui ils sont ni ce qu'ils lisent, ton adresse n'est publiée nulle part, et sa clé n'a aucun lien avec ton identité. <span id="relayState"></span></p>
+            <p class="muted small-text">Ton application transporte des cellules chiffrées pour les autres membres, au milieu de leurs circuits. Elle ne voit ni qui ils sont ni ce qu'ils lisent. Elle ne se connecte qu'aux relais officiels de l'association (eux seuls voient ton adresse), jamais à un relais de membre : ton adresse n'est publiée nulle part (sauf si tu deviens relais d'entrée, ci-dessous), et sa clé n'a aucun lien avec ton identité. <span id="relayState"></span></p>
             <label class="small-text">Débit maximal <input type="number" id="relayKbs" min="32" step="32" onchange="saveHosting(!$('chkHost').checked)"> Ko/s</label>
             <label class="check small-text"><input type="checkbox" id="chkRelayExit" onchange="saveHosting(!$('chkHost').checked)"> Accepter d'être <strong>sortie</strong> de circuit : mon relais transmet les demandes des autres, sous un pseudonyme jetable, sans jamais connaître leur adresse ; uniquement du contenu signé par TUTODECODE.</label>
             <label class="small-text">Mon anonymat :
                 <select id="anonMode" onchange="saveHosting(!$('chkHost').checked)">
-                    <option value="partage">Partagé (conseillé) : la sortie peut être le relais d'un membre</option>
-                    <option value="maximal">Maximal : la sortie est toujours un relais de l'association</option>
+                    <option value="partage">Partagé (conseillé) : l'entrée peut être ta garde bénévole (elle voit ton adresse IP, jamais ce que tu lis) et la sortie le relais d'un membre (il voit ce qui est demandé, jamais ton adresse)</option>
+                    <option value="maximal">Maximal : entrée et sortie toujours chez l'association (seuls ses relais voient ton adresse ou tes demandes, jamais les deux)</option>
                 </select>
             </label>
+            <label class="check small-text"><input type="checkbox" id="chkEntryVol" onchange="saveHosting(!$('chkHost').checked)"> <strong>Entrer par des relais bénévoles (ils verront mon adresse IP)</strong> : une seule « garde », un bénévole présent depuis au moins 30 jours, gardée 60 jours ; elle voit ton adresse IP, jamais ce que tu lis. Jamais en mode Maximal ni quand tu héberges des sites.</label>
+            <label class="check small-text"><input type="checkbox" id="chkEntry" onchange="saveHosting(!$('chkHost').checked)"> Devenir aussi <strong>relais d'entrée</strong> (avancé) : <strong>mon adresse IP (ou celle de mon VPN) devient publique</strong>, publiée dans l'annuaire du réseau ; d'autres membres s'y connectent et je vois leur adresse IP, jamais ce qu'ils lisent.</label>
+            <label class="small-text">Écoute <input type="text" id="entryListen" placeholder="0.0.0.0:8443" onchange="saveHosting(!$('chkHost').checked)"></label>
+            <label class="small-text">Adresse publique <input type="text" id="entryUrl" placeholder="wss://mon-hôte:8443/v1/ws" onchange="saveHosting(!$('chkHost').checked)"> <span id="entryState"></span></label>
         </div>
         <div id="hostPanel" hidden>
             <label class="check"><input type="checkbox" id="chkHostAll" onchange="renderHostSites()"> Tous les sites du catalogue</label>

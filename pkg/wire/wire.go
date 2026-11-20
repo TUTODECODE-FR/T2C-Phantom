@@ -57,8 +57,28 @@ const (
 // MeshSubprotocol : liaison entre relais (point d'entrée /v1/mesh).
 const MeshSubprotocol = "t2c.mesh.v1"
 
-// MeshPayload : ce qu'un relais signe pour prouver sa clé à un autre relais.
-func MeshPayload(nonce []byte) []byte { return append([]byte("t2c/mesh/v1\n"), nonce...) }
+// MeshPayload : ce qu'un relais signe pour prouver sa clé à un autre relais
+// (celui qui ouvre la liaison). Voir HandshakePayload.
+func MeshPayload(nonce []byte) []byte { return HandshakePayload(HSMesh, nonce) }
+
+// Rôles de la poignée de main entre relais. Chaque rôle signe dans son propre
+// domaine : une signature obtenue dans un rôle (réponse à une liaison, sonde
+// d'une adresse, liaison entre bénévoles) ne peut jamais être rejouée dans un
+// autre. Sans cela, un faux bénévole pourrait faire signer à un officiel le
+// défi d'un AUTRE officiel et s'y présenter sous son identité.
+const (
+	HSMesh       = "mesh"        // ouverture d'une liaison vers un relais
+	HSMeshReply  = "mesh-reply"  // réponse du relais qui accepte
+	HSProbe      = "probe"       // sonde d'une adresse publique par un officiel
+	HSProbeReply = "probe-reply" // réponse du bénévole sondé
+	HSPeer       = "peer"        // liaison entre deux bénévoles publics
+	HSPeerReply  = "peer-reply"
+)
+
+// HandshakePayload : ce qui est signé pour un rôle donné de la poignée de main.
+func HandshakePayload(role string, nonce []byte) []byte {
+	return append([]byte("t2c/"+role+"/v1\n"), nonce...)
+}
 
 // Subprotocol : sous-protocole WebSocket exigé par le relais. Toute connexion
 // qui ne l'annonce pas est refusée avant même l'ouverture de la WebSocket.
@@ -111,7 +131,19 @@ type Header struct {
 	Circ     uint64         `json:"circ,omitempty"` // circuit, propre à chaque lien
 	Peer     string         `json:"peer,omitempty"`
 	Hash     []byte         `json:"hash,omitempty"`
+	// Addr : adresse publique (ws:// ou wss://…/v1/ws) annoncée par un relais
+	// bénévole qui accepte d'être relais d'entrée ; vérifiée par sonde.
+	Addr string `json:"addr,omitempty"`
+	// Version : version de l'application (THello) ou du relais (TMeshHello),
+	// comparée au minimum de l'avis de version signé par la racine. Absente
+	// chez les applications d'avant l'avis (traitées comme trop anciennes dès
+	// qu'un minimum est fixé).
+	Version string `json:"version,omitempty"`
 }
+
+// ErrObsolete : motif du refus d'une version sous le minimum (TError, Data =
+// avis de version signé par la racine, pour afficher la page de mise à jour).
+const ErrObsolete = "version obsolète"
 
 // Frame : une trame décodée.
 type Frame struct {

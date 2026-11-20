@@ -139,3 +139,10 @@ input[type=text]:focus, input[type=number]:focus { outline: none; border-color: 
 }
 
 .relay-box { border: 1px solid var(--line, #2a2a2a); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+
+/* avis de version (signé par la racine) */
+.update-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 24px; border-bottom: 1px solid var(--border-strong); font-size: .9rem; }
+.update-banner[hidden] { display: none; }
+.update-banner.available { color: var(--muted); }
+.update-banner.important { background: var(--accent-dim); color: var(--warn); border-color: var(--warn); font-weight: 700; }
+.update-banner.obsolete { background: var(--err-dim); color: var(--err); border-color: var(--err); font-weight: 700; padding: 18px 24px; font-size: 1rem; }

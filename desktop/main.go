@@ -19,6 +19,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
 	"t2c/pkg/api"
+	"t2c/pkg/buildinfo"
 	"t2c/pkg/utils"
 )
 
@@ -26,6 +27,7 @@ import (
 var version = "dev"
 
 func main() {
+	buildinfo.Version = version // annoncée aux relais (avis de version signé)
 	_ = os.MkdirAll(utils.GetT2CDataDir(), 0o700)
 	utils.InitSecurityLogger(utils.GetPath("security.log"))
 

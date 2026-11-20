@@ -1,6 +1,7 @@
 package trust
 
 import (
+	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"testing"
@@ -96,8 +97,8 @@ func TestNetworkPolicy(t *testing.T) {
 	}
 	old := mk()
 	old.Expires = now.Add(-time.Second).Unix()
-	if old.Banned(banned) || old.VolunteerShare() != 100 {
-		t.Fatal("consignes expirées appliquées")
+	if !old.Banned(banned) || old.VolunteerShare() != 100 || old.MinBits(24) != 24 || old.RelayKBs(128) != 128 {
+		t.Fatal("consignes expirées : exclusions gardées, plafonds et parts rendus")
 	}
 
 	// transport dans le catalogue, hors signature racine
@@ -159,5 +160,86 @@ func TestPolicyRevocation(t *testing.T) {
 	_ = bad.Sign(rootPriv)
 	if bad.Verify(rootPub) == nil {
 		t.Fatal("clé révoquée mal formée acceptée")
+	}
+}
+
+// Échec fermé : une consigne expirée garde ses exclusions et son mode urgence
+// (dans le catalogue comme dans PolicyKeeper) ; plafonds et parts reviennent
+// aux défauts ; une consigne plus ancienne ne remplace jamais la dernière.
+func TestPolicyFailClosed(t *testing.T) {
+	rootPub, rootPriv := keys(t)
+	badPub, _ := keys(t)
+	banned := hex.EncodeToString(badPub)
+	now := time.Now()
+	p := &NetworkPolicy{Version: 2, Issued: now.Add(-2 * time.Hour).Unix(), Expires: now.Add(-time.Hour).Unix(),
+		BannedRelays: []string{banned}, Emergency: true, VolunteerPercent: 10, EntryPercent: 10, VolunteerBits: 30}
+	if err := p.SignDelegated(rootPriv, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Verify(rootPub, now); err != ErrPolicyExpired {
+		t.Fatalf("consigne expirée authentique : %v", err)
+	}
+	cat := &Catalog{Version: 1, Issued: now.Unix()}
+	if err := cat.Sign(rootPriv); err != nil {
+		t.Fatal(err)
+	}
+	cat.Policy = p
+	raw, _ := json.Marshal(cat)
+	var got Catalog
+	_ = json.Unmarshal(raw, &got)
+	if err := got.Verify(rootPub); err != nil || got.Policy == nil {
+		t.Fatalf("consigne expirée écartée du catalogue : %v", err)
+	}
+	gp := got.Policy
+	if !gp.Banned(banned) || !gp.Urgent() || gp.VolunteerShare() != 0 || gp.EntryShare() != 0 || gp.MinBits(24) != 24 {
+		t.Fatal("mode dégradé : exclusions et urgence attendues, plafonds par défaut")
+	}
+	gp.Emergency = false // altérée : écartée même expirée
+	raw, _ = json.Marshal(&got)
+	var bad Catalog
+	_ = json.Unmarshal(raw, &bad)
+	if bad.Verify(rootPub) != nil || bad.Policy != nil {
+		t.Fatal("consigne expirée altérée gardée")
+	}
+	var k PolicyKeeper
+	if k.Keep(p) != p || k.Keep(nil) != p {
+		t.Fatal("PolicyKeeper : dernière consigne perdue quand le catalogue n'en porte plus")
+	}
+	older := *p
+	older.Issued--
+	older.Emergency = false
+	if k.Keep(&older) != p {
+		t.Fatal("PolicyKeeper : consigne plus ancienne acceptée (rejeu)")
+	}
+	newer := &NetworkPolicy{Version: 3, Issued: now.Unix(), Expires: now.Add(time.Hour).Unix()}
+	if k.Keep(newer) != newer || newer.Urgent() || newer.VolunteerShare() != 100 {
+		t.Fatal("PolicyKeeper : consigne plus récente ignorée")
+	}
+}
+
+// EntryShare : réglage distinct de VolunteerPercent, ne peut que resserrer.
+func TestEntryShare(t *testing.T) {
+	now := time.Now()
+	var none *NetworkPolicy
+	if none.EntryShare() != 100 {
+		t.Fatal("défaut : entrées bénévoles permises")
+	}
+	p := &NetworkPolicy{Version: 1, Issued: now.Unix(), Expires: now.Add(time.Hour).Unix(), EntryPercent: 30, VolunteerPercent: 80}
+	if p.EntryShare() != 30 || p.VolunteerShare() != 80 {
+		t.Fatal("EntryShare / VolunteerShare")
+	}
+	p.EntryPercent = 0
+	if p.EntryShare() != 100 {
+		t.Fatal("EntryPercent 0 = inchangé")
+	}
+	p.Emergency = true
+	if p.EntryShare() != 0 {
+		t.Fatal("urgence : aucune entrée bénévole")
+	}
+	_, priv := keys(t)
+	q := &NetworkPolicy{Version: 1, Issued: now.Unix(), Expires: now.Add(time.Hour).Unix(), EntryPercent: 101}
+	_ = q.SignDelegated(priv, nil)
+	if q.Verify(priv.Public().(ed25519.PublicKey), now) == nil {
+		t.Fatal("EntryPercent > 100 accepté")
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"github.com/flynn/noise"
 	"github.com/gorilla/websocket"
 
+	"t2c/pkg/buildinfo"
 	"t2c/pkg/peerid"
 	"t2c/pkg/trust"
 	"t2c/pkg/wire"
@@ -48,7 +50,15 @@ type Options struct {
 	// OnServe (bénévole) : appelé avec l'identité présentée par chaque demandeur
 	// servi (vérification de l'anonymat, statistiques). Facultatif.
 	OnServe func(from string)
+	// AppVersion : version annoncée au relais (défaut buildinfo.Version).
+	AppVersion string
 }
+
+// ObsoleteError : le relais refuse cette version (sous le minimum de l'avis de
+// version). Notice : avis signé joint au refus, vérifié (nil sinon).
+type ObsoleteError struct{ Notice *trust.VersionNotice }
+
+func (e *ObsoleteError) Error() string { return "relais: " + wire.ErrObsolete }
 
 type Client struct {
 	id    *peerid.Identity
@@ -58,8 +68,7 @@ type Client struct {
 	guard *trust.VersionGuard
 
 	mu        sync.Mutex
-	nextQ     uint64
-	pending   map[uint64]chan *wire.Frame
+	pending   map[uint64]*pendingReq
 	outs      map[uint64]*outSession
 	tickets   map[string]trust.Ticket // racine → ticket
 	closed    bool
@@ -76,7 +85,46 @@ type Client struct {
 	policy    *trust.NetworkPolicy // consignes réseau du dernier catalogue vérifié
 }
 
+// pendingReq : requête en attente de réponse. Une réponse n'est acceptée que
+// par le canal où la demande est partie (circuit ou connexion directe) et si
+// elle correspond à la demande (type, racine, morceau) : en mode anonyme, le
+// relais d'entrée ne peut pas glisser de fausse réponse à une demande faite
+// par le circuit (il ne connaît d'ailleurs pas Q, tiré au hasard sur 64 bits).
+type pendingReq struct {
+	ch    chan *wire.Frame
+	circ  bool // envoyée par le circuit (mode anonyme)
+	t     wire.Type
+	kind  string
+	root  string
+	index int
+}
+
+func (p *pendingReq) accepts(f *wire.Frame) bool {
+	if f.T == wire.TError {
+		return true
+	}
+	switch p.t {
+	case wire.TFind:
+		return f.T == wire.TFound && f.H.Root == p.root
+	case wire.TGet:
+		return f.T == wire.TData && f.H.Kind == p.kind && f.H.Root == p.root && f.H.Index == p.index
+	case wire.TAnnounce:
+		return f.T == wire.TData
+	case wire.TVolunteer:
+		return f.T == wire.TTicket
+	}
+	return false
+}
+
+// randQ : identifiant de requête imprévisible (jamais 0).
+func randQ() uint64 {
+	var b [8]byte
+	_, _ = rand.Read(b[:])
+	return binary.BigEndian.Uint64(b[:]) | 1
+}
+
 type outSession struct {
+	circ bool // demande partie par le circuit : réponse attendue par lui seul
 	peer string
 	hs   *noise.HandshakeState
 	cs   *noise.CipherState // réception (répondeur → initiateur)
@@ -98,6 +146,19 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 	if opt.Workers == 0 {
 		opt.Workers = 6
 	}
+	if opt.AppVersion == "" {
+		opt.AppVersion = buildinfo.Version
+	}
+	// relais d'entrée bénévole (hors liste racine) : seulement en mode anonyme,
+	// où il ne voit que des cellules chiffrées pour les sauts suivants
+	if len(opt.EntryKey) > 0 && !isOfficial(opt.EntryKey, opt.Relays) && !opt.Anonymous {
+		return nil, errors.New("peerclient: un relais bénévole ne sert que d'entrée anonyme")
+	}
+	// mode Maximal : entrée toujours officielle (aucun bénévole ne voit l'adresse)
+	if len(opt.EntryKey) > 0 && !isOfficial(opt.EntryKey, opt.Relays) &&
+		(opt.AnonMode == ModeMaximal || opt.AnonModeFunc != nil && opt.AnonModeFunc() == ModeMaximal) {
+		return nil, errors.New("peerclient: mode Maximal, entrée par un relais officiel seulement")
+	}
 	d := *websocket.DefaultDialer
 	d.Subprotocols = []string{wire.Subprotocol}
 	ws, _, err := d.DialContext(ctx, url, opt.Header)
@@ -106,7 +167,7 @@ func Dial(ctx context.Context, url string, id *peerid.Identity, opt Options) (*C
 	}
 	c := &Client{
 		id: id, opt: opt, conn: wire.NewConn(ws), rep: NewReputation(),
-		pending: map[uint64]chan *wire.Frame{}, outs: map[uint64]*outSession{},
+		pending: map[uint64]*pendingReq{}, outs: map[uint64]*outSession{},
 		tickets: map[string]trust.Ticket{}, done: make(chan struct{}), serveSem: make(chan struct{}, 8),
 		upload: newRateLimiter(opt.UploadBytesPerSec), building: map[uint64]*circuit{},
 		originSem: make(chan struct{}, originSlots),
@@ -148,7 +209,7 @@ func (c *Client) handshake() error {
 	err = c.conn.Send(&wire.Frame{T: wire.THello, H: wire.Header{
 		Pub: c.id.Pub, Mint: c.id.MintNonce, MintBits: c.id.MintBits,
 		NoisePub: c.id.Noise.PublicKey().Bytes(), NoiseSig: c.id.NoiseSig,
-		Sig: ed25519.Sign(c.id.Priv, wire.HelloPayload(f.H.Nonce)),
+		Sig: ed25519.Sign(c.id.Priv, wire.HelloPayload(f.H.Nonce)), Version: c.opt.AppVersion,
 	}})
 	if err != nil {
 		return err
@@ -157,6 +218,9 @@ func (c *Client) handshake() error {
 	if err != nil {
 		return err
 	}
+	if f.T == wire.TError && f.H.Err == wire.ErrObsolete {
+		return &ObsoleteError{Notice: c.obsoleteNotice(f.Data)}
+	}
 	if f.T == wire.TError {
 		return errors.New("relais: " + f.H.Err)
 	}
@@ -164,6 +228,19 @@ func (c *Client) handshake() error {
 		return errors.New("bienvenue attendue")
 	}
 	return nil
+}
+
+// obsoleteNotice : avis joint au refus « version obsolète », gardé seulement
+// s'il est signé par la racine et pas plus ancien que le dernier vu (le
+// relais ne peut donc ni inventer une adresse de mise à jour ni rejouer un
+// vieil avis).
+func (c *Client) obsoleteNotice(data []byte) *trust.VersionNotice {
+	var v trust.VersionNotice
+	if len(data) == 0 || len(data) > 4096 || json.Unmarshal(data, &v) != nil ||
+		v.Verify(c.opt.RootKey) != nil || c.guard.Accept("versions", v.Version) != nil {
+		return nil
+	}
+	return &v
 }
 
 func (c *Client) ID() string              { return c.id.ID() }
@@ -180,8 +257,8 @@ func (c *Client) Close() error {
 func (c *Client) readLoop() {
 	defer func() {
 		c.mu.Lock()
-		for q, ch := range c.pending {
-			close(ch)
+		for q, p := range c.pending {
+			close(p.ch)
 			delete(c.pending, q)
 		}
 		for sid, o := range c.outs {
@@ -205,48 +282,64 @@ func (c *Client) readLoop() {
 		case wire.TAudit:
 			go c.onAudit(f)
 		default:
-			c.handle(f)
+			c.handle(f, false)
 		}
 	}
 }
 
-// handle : trame reçue directement ou extraite d'un circuit.
-func (c *Client) handle(f *wire.Frame) {
+// handle : trame reçue directement (viaCirc faux) ou extraite d'un circuit.
+// Chaque réponse n'est remise qu'à une demande partie par le même canal.
+func (c *Client) handle(f *wire.Frame, viaCirc bool) {
 	switch f.T {
 	case wire.TFwd:
-		c.onFwd(f)
+		c.onFwd(f, viaCirc)
 	case wire.TError:
 		if f.H.SID != 0 {
-			c.failOut(f.H.SID, errors.New(f.H.Err))
+			c.failOut(f.H.SID, viaCirc, errors.New(f.H.Err))
 			return
 		}
-		c.deliver(f)
+		c.deliver(f, viaCirc)
 	default:
-		c.deliver(f)
+		c.deliver(f, viaCirc)
 	}
 }
 
-func (c *Client) deliver(f *wire.Frame) {
+// deliver : réponse remise à la demande en attente de même Q, seulement si
+// elle arrive par le canal de la demande et lui correspond ; sinon ignorée
+// (en mode anonyme, toute trame directe inattendue est ainsi écartée).
+func (c *Client) deliver(f *wire.Frame, viaCirc bool) {
 	c.mu.Lock()
-	ch := c.pending[f.H.Q]
+	p := c.pending[f.H.Q]
+	if p == nil || p.circ != viaCirc || !p.accepts(f) {
+		c.mu.Unlock()
+		return
+	}
 	delete(c.pending, f.H.Q)
 	c.mu.Unlock()
-	if ch != nil {
-		ch <- f
-	}
+	p.ch <- f
 }
 
-// request : envoie une trame et attend la réponse au même Q.
+// request : envoie une trame et attend la réponse au même Q. Demandes de
+// consultation (annuaire des bénévoles excepté) : par le circuit en mode anonyme.
 func (c *Client) request(ctx context.Context, f *wire.Frame) (*wire.Frame, error) {
-	ch := make(chan *wire.Frame, 1)
+	data := (f.T == wire.TFind || f.T == wire.TGet) && f.H.Kind != wire.KindVolunteers
+	return c.requestVia(ctx, f, data && c.opt.Anonymous)
+}
+
+// requestVia : circ vrai = par le circuit uniquement (jamais en clair à la place).
+func (c *Client) requestVia(ctx context.Context, f *wire.Frame, circ bool) (*wire.Frame, error) {
+	p := &pendingReq{ch: make(chan *wire.Frame, 1), circ: circ, t: f.T, kind: f.H.Kind, root: f.H.Root, index: f.H.Index}
+	ch := p.ch
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return nil, errors.New("fermé")
 	}
-	c.nextQ++
-	q := c.nextQ
-	c.pending[q] = ch
+	q := randQ()
+	for c.pending[q] != nil {
+		q = randQ()
+	}
+	c.pending[q] = p
 	c.mu.Unlock()
 	defer func() {
 		c.mu.Lock()
@@ -255,8 +348,8 @@ func (c *Client) request(ctx context.Context, f *wire.Frame) (*wire.Frame, error
 	}()
 	f.H.Q = q
 	send := c.conn.Send
-	if (f.T == wire.TFind || f.T == wire.TGet) && f.H.Kind != wire.KindVolunteers {
-		send = c.sendData // demandes de consultation : par le circuit en mode anonyme
+	if circ {
+		send = c.sendData
 	}
 	if err := send(f); err != nil {
 		return nil, err
@@ -306,13 +399,27 @@ func (c *Client) Catalog(ctx context.Context) (*trust.Catalog, error) {
 			return nil, err
 		}
 	}
+	if cat.Versions != nil {
+		if err := c.guard.Accept("versions", cat.Versions.Version); err != nil {
+			return nil, err
+		}
+	}
 	if cat.Policy != nil {
 		if err := c.guard.Accept("policy:"+cat.Policy.Signer(), cat.Policy.Version); err != nil {
 			return nil, err
 		}
 		c.mu.Lock()
 		c.policy = cat.Policy
+		// entrée par un bénévole que les consignes écartent (urgence, exclu) :
+		// on la quitte tout de suite (le catalogue, signé, reste valable) ;
+		// sinon le premier circuit, construit avant de connaître les
+		// consignes, continuerait de servir le membre
+		leave := len(c.opt.EntryKey) > 0 && !isOfficial(c.opt.EntryKey, c.opt.Relays) &&
+			(cat.Policy.VolunteerShare() == 0 || cat.Policy.EntryShare() == 0 || cat.Policy.Banned(hex.EncodeToString(c.opt.EntryKey)))
 		c.mu.Unlock()
+		if leave {
+			go c.Close()
+		}
 	}
 	for _, h := range cat.Heads { // tête de site plus ancienne que la dernière vue : refusée
 		if err := c.guard.Accept("head:"+h.Site, uint64(h.Issued)); err != nil {
@@ -435,7 +542,7 @@ func (c *Client) FetchFromPeer(ctx context.Context, h wire.HostInfo, root string
 	var sidb [8]byte
 	_, _ = rand.Read(sidb[:])
 	sid := binary.BigEndian.Uint64(sidb[:]) | 1
-	o := &outSession{peer: h.Peer, hs: hs, max: trust.ChunkSize, ch: make(chan outResult, 1)}
+	o := &outSession{circ: c.opt.Anonymous, peer: h.Peer, hs: hs, max: trust.ChunkSize, ch: make(chan outResult, 1)}
 	c.mu.Lock()
 	c.outs[sid] = o
 	c.mu.Unlock()
@@ -455,23 +562,30 @@ func (c *Client) FetchFromPeer(ctx context.Context, h wire.HostInfo, root string
 	}
 }
 
-func (c *Client) failOut(sid uint64, err error) {
+func (c *Client) failOut(sid uint64, viaCirc bool, err error) {
 	c.mu.Lock()
 	o := c.outs[sid]
+	if o == nil || o.circ != viaCirc {
+		c.mu.Unlock()
+		return
+	}
 	delete(c.outs, sid)
 	c.mu.Unlock()
-	if o != nil {
-		o.ch <- outResult{err: err}
-	}
+	o.ch <- outResult{err: err}
 }
 
-func (c *Client) onFwd(f *wire.Frame) {
+func (c *Client) onFwd(f *wire.Frame, viaCirc bool) {
 	c.mu.Lock()
 	o := c.outs[f.H.SID]
 	c.mu.Unlock()
-	if o != nil && o.peer == f.H.From {
-		c.onResponsePart(f.H.SID, o, f.Data)
+	if o != nil {
+		if o.peer == f.H.From && o.circ == viaCirc {
+			c.onResponsePart(f.H.SID, o, f.Data)
+		}
 		return
+	}
+	if viaCirc {
+		return // personne ne nous sert par le circuit (pseudonyme jetable)
 	}
 	// sinon : nouvelle demande entrante (nous sommes bénévole)
 	if c.opt.Store == nil {
@@ -513,7 +627,7 @@ func (c *Client) onResponsePart(sid uint64, o *outSession, data []byte) {
 		}
 	}
 	if err != nil {
-		c.failOut(sid, err)
+		c.failOut(sid, o.circ, err)
 	}
 }
 

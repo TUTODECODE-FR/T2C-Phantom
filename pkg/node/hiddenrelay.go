@@ -12,6 +12,11 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"net/http"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -32,6 +37,8 @@ type hiddenRelay struct {
 	official []string
 	kbs      int64
 	exit     bool
+	entry    string       // relais d'entrée demandé (écoute|adresse), vide sinon
+	srv      *http.Server // écoute publique (relais d'entrée), nil sinon
 }
 
 // officialMeshRelays : relais officiels joignables (liste signée par la racine).
@@ -80,7 +87,12 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 	}
 	kbs := n.relayPolicy.RelayKBs(h.RelayKBs) // les consignes ne peuvent que baisser le plafond
 	n.mu.Unlock()
-	if cur != nil && (!want || !slices.Equal(cur.official, official) || cur.kbs != kbs || cur.exit != h.relayExitOn()) {
+	entry := ""
+	if h.entryOn() {
+		entry = h.EntryListen + "|" + h.EntryURL
+	}
+	if cur != nil && (!want || !slices.Equal(cur.official, official) || cur.kbs != kbs || cur.exit != h.relayExitOn() ||
+		cur.entry != entry || entry != "" && cur.srv == nil) {
 		n.stopHiddenRelay()
 		cur = nil
 	}
@@ -92,17 +104,40 @@ func (n *Node) syncHiddenRelay(ctx context.Context) {
 		n.setErr(err)
 		return
 	}
-	b := broker.New(broker.Config{RootKey: n.cfg.RootKey, MintBits: n.cfg.MintBits,
+	b := broker.New(broker.Config{RootKey: n.cfg.RootKey, MintBits: n.cfg.MintBits, MaxPeers: 256, Version: n.cfg.AppVersion,
 		GlobalBytesPerSec: float64(kbs) * 1024}, broker.NewMeshOrigin())
+	// relais d'entrée : écoute ouverte AVANT l'annonce (l'officiel sonde aussitôt)
+	var ln net.Listener
+	publicURL := ""
+	if entry != "" {
+		if ln, err = net.Listen("tcp", h.EntryListen); err != nil {
+			n.setErr(fmt.Errorf("relais d'entrée %s: %w", h.EntryListen, err))
+		} else {
+			publicURL = h.EntryURL
+		}
+	}
 	if err := b.EnableMesh(broker.MeshConfig{Key: id.Priv, Volunteer: true, Mint: id.MintNonce, MintBits: id.MintBits,
-		VolunteerExit: h.relayExitOn(), Official: official, Every: n.hiddenEvery(), MaxCircuits: 64}); err != nil {
+		VolunteerExit: h.relayExitOn(), Official: official, Every: n.hiddenEvery(), MaxCircuits: 64,
+		PublicURL: publicURL, AllowPrivateProbe: n.cfg.AllowPrivateRelay}); err != nil {
+		if ln != nil {
+			_ = ln.Close()
+		}
 		n.setErr(err)
 		return
+	}
+	var srv *http.Server
+	if ln != nil {
+		mux := http.NewServeMux()
+		mux.Handle("GET /v1/ws", b)
+		mux.Handle("GET /v1/mesh", b.MeshHandler())
+		srv = &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 120 * time.Second,
+			MaxHeaderBytes: 16 << 10, ErrorLog: log.New(io.Discard, "", 0)} // erreurs HTTP : adresses, jetées
+		go func() { _ = srv.Serve(ln) }()
 	}
 	rctx, cancel := context.WithCancel(ctx)
 	go b.RunMesh(rctx)
 	n.mu.Lock()
-	n.hidden = &hiddenRelay{b: b, cancel: cancel, official: official, kbs: kbs, exit: h.relayExitOn()}
+	n.hidden = &hiddenRelay{b: b, cancel: cancel, official: official, kbs: kbs, exit: h.relayExitOn(), entry: entry, srv: srv}
 	n.mu.Unlock()
 }
 
@@ -120,6 +155,9 @@ func (n *Node) stopHiddenRelay() {
 	n.mu.Unlock()
 	if cur != nil {
 		cur.cancel()
+		if cur.srv != nil {
+			_ = cur.srv.Close()
+		}
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"slices"
+	"sync"
 	"time"
 )
 
@@ -17,8 +18,11 @@ import (
 // peut jamais forcer un bénévole à faire sortie ni relever un plafond local :
 // une clé de service volée ne peut que ralentir le réseau, pas désanonymiser.
 //
-// Elle expire (MaxPolicyTTL au plus) : si le serveur maison tombe, tout le
-// monde revient aux réglages par défaut.
+// Elle expire (MaxPolicyTTL au plus) : si le serveur maison tombe, plafonds et
+// pourcentages reviennent aux réglages par défaut, mais les relais exclus et le
+// mode urgence de la DERNIÈRE consigne valide restent appliqués (mode dégradé,
+// échec fermé) jusqu'à l'arrivée d'une consigne plus récente : laisser expirer
+// les consignes ne doit jamais réintégrer un relais espion.
 //
 // Transportée dans le catalogue (champ « policy »), hors de sa signature,
 // comme RelayList.
@@ -48,6 +52,10 @@ type NetworkPolicy struct {
 	// VolunteerPercent : part des circuits qui passent par des bénévoles,
 	// 1..100 (0 = inchangé, c.-à-d. 100).
 	VolunteerPercent int `json:"volunteer_percent,omitempty"`
+	// EntryPercent : part des connexions des membres qui peuvent ENTRER par un
+	// relais bénévole public (qui voit alors leur adresse IP), 1..100
+	// (0 = inchangé, c.-à-d. 100). Réglage distinct de VolunteerPercent.
+	EntryPercent int `json:"entry_percent,omitempty"`
 	// Emergency : tout passe par les relais officiels (aucun bénévole).
 	Emergency bool        `json:"emergency,omitempty"`
 	Deleg     *Delegation `json:"deleg,omitempty"`
@@ -70,11 +78,12 @@ func (p *NetworkPolicy) Verify(root ed25519.PublicKey, now time.Time) error {
 	if p.Version == 0 || p.Expires <= p.Issued || time.Duration(p.Expires-p.Issued)*time.Second > MaxPolicyTTL {
 		return bad
 	}
-	if now.Unix() >= p.Expires || p.Issued > now.Unix()+60 {
-		return errors.New("trust: consignes réseau expirées ou futures")
+	if p.Issued > now.Unix()+60 {
+		return errors.New("trust: consignes réseau futures")
 	}
 	if len(p.BannedRelays) > MaxPolicyBans || p.VolunteerBits < 0 || p.VolunteerBits > maxPolicyBits ||
-		p.MaxPerFamily < 0 || p.HiddenRelayKBs < 0 || p.VolunteerPercent < 0 || p.VolunteerPercent > 100 {
+		p.MaxPerFamily < 0 || p.HiddenRelayKBs < 0 || p.VolunteerPercent < 0 || p.VolunteerPercent > 100 ||
+		p.EntryPercent < 0 || p.EntryPercent > 100 {
 		return bad
 	}
 	for _, k := range p.BannedRelays {
@@ -88,7 +97,36 @@ func (p *NetworkPolicy) Verify(root ed25519.PublicKey, now time.Time) error {
 	}
 	u := *p
 	u.Sig = ""
-	return verify(k, domPolicy, u, p.Sig)
+	if err := verify(k, domPolicy, u, p.Sig); err != nil {
+		return err
+	}
+	if now.Unix() >= p.Expires { // signature valable : l'appelant peut la garder en mode dégradé
+		return ErrPolicyExpired
+	}
+	return nil
+}
+
+// ErrPolicyExpired : consignes authentiques mais expirées. Seuls leurs relais
+// exclus et leur mode urgence restent appliqués (voir live).
+var ErrPolicyExpired = errors.New("trust: consignes réseau expirées")
+
+// PolicyKeeper garde la dernière consigne valide vue (relais, applications) :
+// si le catalogue n'en porte plus (serveur maison arrêté), ses exclusions et
+// son mode urgence restent en vigueur. Une consigne plus ancienne (rejouée)
+// ne la remplace jamais.
+type PolicyKeeper struct {
+	mu sync.Mutex
+	p  *NetworkPolicy
+}
+
+// Keep : retient p s'il est au moins aussi récent, renvoie la consigne en vigueur.
+func (k *PolicyKeeper) Keep(p *NetworkPolicy) *NetworkPolicy {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if p != nil && (k.p == nil || p.Issued >= k.p.Issued) {
+		k.p = p
+	}
+	return k.p
 }
 
 // Signer : clé qui a signé (hex de la clé de service, ou « root »). Sert à
@@ -108,14 +146,19 @@ func (r *RelayList) revoked(key string) bool {
 
 // live : consignes encore valides (une copie en cache peut avoir expiré).
 // Toutes les méthodes ci-dessous acceptent un récepteur nil (aucune consigne).
+// Plafonds et pourcentages ne s'appliquent que tant qu'elles sont valides ;
+// exclusions et mode urgence restent appliqués après expiration (échec fermé).
 func (p *NetworkPolicy) live() bool {
 	return p != nil && time.Now().Unix() < p.Expires
 }
 
-// Banned : la clé (hex minuscule) est exclue du réseau.
+// Banned : la clé (hex minuscule) est exclue du réseau (même consigne expirée).
 func (p *NetworkPolicy) Banned(keyHex string) bool {
-	return p.live() && slices.Contains(p.BannedRelays, keyHex)
+	return p != nil && slices.Contains(p.BannedRelays, keyHex)
 }
+
+// Urgent : mode urgence (même consigne expirée) : tout par les officiels.
+func (p *NetworkPolicy) Urgent() bool { return p != nil && p.Emergency }
 
 // MinBits : preuve de travail exigée = la plus dure des deux.
 func (p *NetworkPolicy) MinBits(local int) int {
@@ -144,12 +187,22 @@ func (p *NetworkPolicy) RelayKBs(local int64) int64 {
 // VolunteerShare : pourcentage des circuits autorisés à passer par des bénévoles.
 func (p *NetworkPolicy) VolunteerShare() int {
 	switch {
-	case !p.live():
-		return 100
-	case p.Emergency:
+	case p.Urgent():
 		return 0
-	case p.VolunteerPercent > 0:
+	case p.live() && p.VolunteerPercent > 0:
 		return p.VolunteerPercent
+	}
+	return 100
+}
+
+// EntryShare : pourcentage des connexions autorisées à entrer par un relais
+// bénévole public (tirage « entrée bénévole ou officielle » fait d'abord).
+func (p *NetworkPolicy) EntryShare() int {
+	switch {
+	case p.Urgent():
+		return 0
+	case p.live() && p.EntryPercent > 0:
+		return p.EntryPercent
 	}
 	return 100
 }

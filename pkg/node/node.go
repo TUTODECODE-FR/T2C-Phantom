@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"t2c/pkg/buildinfo"
 	"t2c/pkg/peerclient"
 	"t2c/pkg/peerid"
 	"t2c/pkg/trust"
@@ -48,6 +49,23 @@ type Config struct {
 	HiddenRelayEvery time.Duration
 	// RelayMintBits : preuve de travail de la clé du relais caché (défaut broker.DefaultVolunteerBits).
 	RelayMintBits int
+	// AllowPrivateRelay : le relais caché peut joindre des adresses locales (tests uniquement).
+	AllowPrivateRelay bool
+	// AppVersion : version annoncée aux relais (défaut buildinfo.Version).
+	AppVersion string
+	// GuardMinAge : ancienneté minimale d'un bénévole pour devenir garde
+	// d'entrée (0 = DefaultGuardMinAge, 30 jours ; <0 = aucune, tests).
+	GuardMinAge time.Duration
+}
+
+// VersionStatus : situation de l'application face à l'avis de version signé
+// par la racine. URL et Notes ne viennent QUE de l'avis vérifié.
+type VersionStatus struct {
+	Current string `json:"current"`
+	Latest  string `json:"latest,omitempty"`
+	Level   string `json:"level"` // ok | available | important | obsolete
+	Notes   string `json:"notes,omitempty"`
+	URL     string `json:"url,omitempty"`
 }
 
 type HostedSite struct {
@@ -76,6 +94,13 @@ type Status struct {
 	FromOrigin  int64        `json:"chunks_from_origin"`
 	BadChunks   int64        `json:"bad_chunks_rejected"`
 	Peers       []PeerInfo   `json:"peers"`
+
+	// relais d'entrée (C1)
+	EntryRelay     bool `json:"entry_relay"`     // ce relais écoute et annonce son adresse publique
+	EntryVerified  bool `json:"entry_verified"`  // adresse vérifiée : présente dans l'annuaire signé d'un officiel
+	EntryVolunteer bool `json:"entry_volunteer"` // connecté par le relais d'entrée d'un bénévole
+
+	Version VersionStatus `json:"version"`
 }
 
 // PeerInfo : un bénévole rencontré (clé pseudonyme, jamais d'IP).
@@ -107,9 +132,14 @@ type Node struct {
 	relayPolicy *trust.NetworkPolicy   // dernières consignes réseau vues par le relais caché
 	relayID     *peerid.Identity       // identité du relais caché (distincte de id)
 	relayIDMu   sync.Mutex
+	entryVol    bool               // connexion actuelle par un relais d'entrée bénévole
+	guardMu     sync.Mutex         // guards.json
+	policyKeep  trust.PolicyKeeper // dernière consigne réseau valide (échec fermé)
 	stats       struct{ peers, origin, bad int64 }
 	hosting     Hosting
-	relay       string // relais actuellement utilisé
+	relay       string               // relais actuellement utilisé
+	notice      *trust.VersionNotice // dernier avis de version vérifié
+	obsolete    bool                 // refusée par les relais (sous le minimum)
 	recMu       sync.Mutex
 
 	cancel context.CancelFunc
@@ -123,6 +153,9 @@ func Start(ctx context.Context, cfg Config) (*Node, error) {
 	}
 	if cfg.MintBits == 0 {
 		cfg.MintBits = peerid.DefaultMintBits
+	}
+	if cfg.AppVersion == "" {
+		cfg.AppVersion = buildinfo.Version
 	}
 	if len(cfg.RootKey) == 0 {
 		k, err := trust.RootKey()
@@ -180,19 +213,53 @@ func (n *Node) run(ctx context.Context) {
 	for ctx.Err() == nil {
 		relays := n.relayCandidates()
 		url := relays[attempt%len(relays)]
-		attempt++
 		// anonymat automatique dès que la liste signée compte au moins deux relais
 		keys := n.relayKeys()
 		entry := entryKey(url, keys)
+		id, store := n.id, n.store
+		// relais d'entrée bénévole (premier essai seulement ; repli sur les officiels)
+		vol := (*entryCand)(nil)
+		if attempt == 0 {
+			vol = n.pickEntry(keys)
+		}
+		if vol != nil {
+			k, kerr := trust.ParsePublicKey(vol.Key)
+			eid, ierr := n.entryIdentity()
+			if kerr != nil || ierr != nil || !peerclient.AnonymityPossible(k, keys) {
+				n.entryFailed(vol.Key)
+				continue
+			}
+			url, entry, id, store = vol.URL, k, eid, nil
+		} else {
+			attempt++
+		}
 		anon := !n.cfg.NoAnonymity && peerclient.AnonymityPossible(entry, keys)
 		dctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		c, err := peerclient.Dial(dctx, url, n.id, peerclient.Options{
-			RootKey: n.cfg.RootKey, Store: n.store, Guard: n.guard,
+		c, err := peerclient.Dial(dctx, url, id, peerclient.Options{
+			RootKey: n.cfg.RootKey, Store: store, Guard: n.guard,
 			UploadBytesPerSec: n.hostingPrefs().MaxUploadKBs * 1024,
 			Anonymous:         anon, EntryKey: entry, Relays: keys, AvoidRelay: n.hiddenRelayKey(),
-			AnonMode: n.hostingPrefs().AnonMode,
+			AnonMode: n.hostingPrefs().AnonMode, AppVersion: n.cfg.AppVersion,
 		})
 		cancel()
+		var obs *peerclient.ObsoleteError
+		if errors.As(err, &obs) {
+			// version refusée par le réseau : inutile d'insister, tous les
+			// relais appliquent le même minimum ; on réessaie rarement (une
+			// mise à jour de l'avis peut abaisser le minimum)
+			n.setObsolete(obs.Notice)
+			n.setErr(errors.New("version obsolète : le réseau refuse cette version, mets l'application à jour"))
+			attempt = 0
+			sleep(ctx, ObsoleteRetry)
+			continue
+		}
+		if err != nil && vol != nil {
+			n.entryFailed(vol.Key) // garde injoignable : secours, sinon un officiel
+			continue
+		}
+		if err == nil && vol != nil {
+			n.entryOK(vol.Key)
+		}
 		if err != nil {
 			n.setErr(fmt.Errorf("relais %s: %w", url, err))
 			if attempt%len(relays) == 0 { // tous essayés : on patiente
@@ -203,8 +270,10 @@ func (n *Node) run(ctx context.Context) {
 		}
 		backoff, attempt = time.Second, 0
 		n.mu.Lock()
+		n.obsolete = false
 		n.relay = url
 		n.client = c
+		n.entryVol = vol != nil
 		n.lastErr = ""
 		c.AdoptTickets(n.tickets)
 		close(n.connected)
@@ -257,6 +326,30 @@ func (n *Node) waitClient(ctx context.Context) (*peerclient.Client, error) {
 	}
 }
 
+// ObsoleteRetry : délai entre deux essais quand le réseau refuse la version.
+var ObsoleteRetry = time.Hour
+
+func (n *Node) setObsolete(v *trust.VersionNotice) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.obsolete = true
+	if v != nil && (n.notice == nil || v.Version >= n.notice.Version) {
+		n.notice = v
+	}
+}
+
+// versionStatus (n.mu tenu).
+func (n *Node) versionStatus() VersionStatus {
+	vs := VersionStatus{Current: n.cfg.AppVersion, Level: n.notice.Level(n.cfg.AppVersion)}
+	if n.obsolete { // refus du relais : fait foi, même pour une version « dev »
+		vs.Level = trust.LevelObsolete
+	}
+	if n.notice != nil {
+		vs.Latest, vs.Notes, vs.URL = n.notice.Latest, n.notice.Notes, n.notice.URL
+	}
+	return vs
+}
+
 func (n *Node) setErr(err error) {
 	n.mu.Lock()
 	n.lastErr = err.Error()
@@ -283,6 +376,10 @@ func (n *Node) refreshCatalog(ctx context.Context, c *peerclient.Client) (*trust
 	}
 	n.mu.Lock()
 	n.catalog, n.catalogAt = cat, time.Now()
+	n.policyKeep.Keep(cat.Policy)
+	if cat.Versions != nil {
+		n.notice = cat.Versions
+	}
 	n.mu.Unlock()
 	return cat, nil
 }
@@ -459,9 +556,15 @@ func (n *Node) Status() Status {
 	st.Relays = len(n.relayKeys())
 	st.RelayLinks = links
 	st.HiddenRelay = n.hidden != nil
+	if n.hidden != nil && n.hidden.srv != nil {
+		st.EntryRelay = true
+		st.EntryVerified = n.hidden.b.PublicVerified()
+	}
+	st.EntryVolunteer = n.client != nil && n.entryVol
 	if n.catalog != nil {
 		st.CatalogVer = n.catalog.Version
 	}
+	st.Version = n.versionStatus()
 	tickets := n.tickets
 	if n.client != nil {
 		tickets = n.client.Tickets()

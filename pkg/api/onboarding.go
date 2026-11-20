@@ -119,6 +119,25 @@ func (d *Dashboard) handleOpen(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true})
 }
 
+// handleUpdateOpen : ouvre la page de mise à jour de l'avis de version signé
+// par la racine (jamais une adresse fournie par l'interface ou un relais).
+func (d *Dashboard) handleUpdateOpen(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST attendu", http.StatusMethodNotAllowed)
+		return
+	}
+	st, running := d.status()
+	if !running || st.Version.URL == "" {
+		writeJSON(w, map[string]any{"ok": false, "error": "aucune page de mise à jour annoncée"})
+		return
+	}
+	if err := sysint.OpenURL(readBrowserPref(), st.Version.URL); err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
 func browserPrefPath() string { return filepath.Join(utils.GetT2CDataDir(), "browser") }
 func readBrowserPref() string {
 	b, _ := os.ReadFile(browserPrefPath())
@@ -182,5 +201,6 @@ func (d *Dashboard) handleHosting(w http.ResponseWriter, r *http.Request) {
 		"ok": true, "hosting": st.Hosting, "hosted": st.Hosted,
 		"storeBytes": st.StoreBytes, "servedBytes": st.Served, "volunteer": st.Volunteer,
 		"hiddenRelay": st.HiddenRelay, "relayLinks": st.RelayLinks,
+		"entryRelay": st.EntryRelay, "entryVerified": st.EntryVerified,
 	})
 }

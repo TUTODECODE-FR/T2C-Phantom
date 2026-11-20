@@ -44,9 +44,17 @@ type Catalog struct {
 	// catalogue, voir RelayList). Mis à nil par Verify s'il est invalide.
 	Relays *RelayList `json:"relays,omitempty"`
 	// Policy : consignes réseau (hors signature du catalogue, voir
-	// NetworkPolicy). Mises à nil par Verify si invalides ou expirées.
+	// NetworkPolicy). Mises à nil par Verify si invalides ; expirées mais
+	// authentiques, gardées (exclusions et urgence seulement : échec fermé).
 	Policy *NetworkPolicy `json:"policy,omitempty"`
-	base   []SiteEntry
+	// Versions : avis de version signé par la racine (hors signature du
+	// catalogue, voir VersionNotice). Mis à nil par Verify s'il est invalide.
+	Versions *VersionNotice `json:"versions,omitempty"`
+	// RelayRelease : version du relais à installer, signée par la clé de mise
+	// à jour (hors signature du catalogue, voir RelayRelease). Mise à nil par
+	// Verify si invalide ou signée par une clé révoquée.
+	RelayRelease *RelayRelease `json:"relay_release,omitempty"`
+	base         []SiteEntry
 }
 
 // HostEntry : un bénévole approuvé. Pas d'IP : seulement l'ID de pair libp2p,
@@ -120,7 +128,7 @@ func verify(pub ed25519.PublicKey, domain string, unsigned any, sigHex string) e
 func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
 	c.base = nil
 	u := *c
-	u.Sig, u.Heads, u.Relays, u.Policy = "", nil, nil, nil
+	u.Sig, u.Heads, u.Relays, u.Policy, u.Versions, u.RelayRelease = "", nil, nil, nil, nil, nil
 	s, err := sign(priv, domCatalog, u)
 	c.Sig = s
 	return err
@@ -128,7 +136,7 @@ func (c *Catalog) Sign(priv ed25519.PrivateKey) error {
 
 func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	u := *c
-	u.Sig, u.Heads, u.Relays, u.Policy, u.base = "", nil, nil, nil, nil
+	u.Sig, u.Heads, u.Relays, u.Policy, u.Versions, u.RelayRelease, u.base = "", nil, nil, nil, nil, nil, nil
 	u.Sites = c.Base()
 	if err := verify(pub, domCatalog, u, c.Sig); err != nil {
 		return err
@@ -146,8 +154,18 @@ func (c *Catalog) Verify(pub ed25519.PublicKey) error {
 	if c.Relays != nil && c.Relays.Verify(pub) != nil {
 		c.Relays = nil // liste invalide : ignorée, jamais utilisée
 	}
-	if c.Policy != nil && (c.Policy.Verify(pub, time.Now()) != nil || c.Relays.revoked(c.Policy.Signer())) {
-		c.Policy = nil // consignes invalides, expirées ou d'une clé révoquée : ignorées
+	if c.Policy != nil {
+		// consignes invalides ou d'une clé révoquée : ignorées ; expirées mais
+		// authentiques : gardées (exclusions et urgence seulement, voir live)
+		if err := c.Policy.Verify(pub, time.Now()); err != nil && !errors.Is(err, ErrPolicyExpired) || c.Relays.revoked(c.Policy.Signer()) {
+			c.Policy = nil
+		}
+	}
+	if c.Versions != nil && c.Versions.Verify(pub) != nil {
+		c.Versions = nil // avis invalide : ignoré
+	}
+	if c.RelayRelease != nil && (c.RelayRelease.Verify(pub, time.Now()) != nil || c.Relays.revoked(c.RelayRelease.Signer())) {
+		c.RelayRelease = nil // release invalide ou d'une clé révoquée : ignorée
 	}
 	return nil
 }

@@ -70,6 +70,7 @@ func (d *Dashboard) APIHandler() http.Handler {
 	mux.HandleFunc("/api/setup/proxy", d.handleSetupProxy)
 	mux.HandleFunc("/api/browsers", d.handleBrowsers)
 	mux.HandleFunc("/api/open", d.handleOpen)
+	mux.HandleFunc("/api/update/open", d.handleUpdateOpen)
 	mux.HandleFunc("/api/sites", d.handleSites)
 	mux.HandleFunc("/api/hosting", d.handleHosting)
 	return mux
@@ -181,6 +182,7 @@ func (d *Dashboard) handleStatus(w http.ResponseWriter, r *http.Request) {
 			"anonymous":    st.Anonymous,
 			"circuitHops":  st.Hops,
 			"relays":       st.Relays,
+			"version":      st.Version,
 		}
 	}
 	writeJSON(w, out)

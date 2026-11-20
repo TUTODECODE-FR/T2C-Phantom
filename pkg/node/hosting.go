@@ -29,11 +29,33 @@ type Hosting struct {
 	RelayKBs    int64 `json:"relay_kbs"` // débit maximal relayé
 	// RelayExit : le relais caché accepte aussi d'être sortie de circuit.
 	RelayExit *bool `json:"relay_exit,omitempty"`
-	// AnonMode : « partage » (défaut) ou « maximal » (sortie toujours chez l'association).
+	// AnonMode : « partage » (défaut) ou « maximal » (entrée et sortie toujours
+	// chez l'association).
 	AnonMode string `json:"anon_mode,omitempty"`
+	// EntryVolunteers : entrer par des relais bénévoles (ils voient alors
+	// l'adresse IP du membre). Activé par défaut en mode Partagé (une seule
+	// garde, gardée 60 jours, voir pickEntry) ; toujours désactivé en Maximal.
+	EntryVolunteers *bool `json:"entry_volunteers,omitempty"`
+	// Relais d'ENTRÉE (choix explicite, désactivé par défaut) : le relais caché
+	// écoute aussi sur EntryListen et annonce EntryURL (ma propre adresse, ou un
+	// VPN avec redirection de port). Les membres qui entrent par lui lui montrent
+	// leur adresse IP ; lui-même expose la sienne (ou celle du VPN).
+	EntryRelay  bool   `json:"entry_relay,omitempty"`
+	EntryListen string `json:"entry_listen,omitempty"` // ex. 0.0.0.0:8443
+	EntryURL    string `json:"entry_url,omitempty"`    // ex. wss://mon-hôte:8443/v1/ws
 }
 
-func (h Hosting) relayOn() bool     { return h.HiddenRelay == nil || *h.HiddenRelay }
+const defaultEntryListen = "0.0.0.0:8443"
+
+// entryOn : relais d'entrée demandé avec une adresse publique.
+func (h Hosting) entryOn() bool { return h.EntryRelay && h.EntryURL != "" }
+
+func (h Hosting) relayOn() bool { return h.HiddenRelay == nil || *h.HiddenRelay }
+
+// entryVolunteersOn : entrée par une garde bénévole permise (jamais en Maximal).
+func (h Hosting) entryVolunteersOn() bool {
+	return h.AnonMode != peerclient.ModeMaximal && (h.EntryVolunteers == nil || *h.EntryVolunteers)
+}
 func (h Hosting) relayExitOn() bool { return h.RelayExit == nil || *h.RelayExit }
 
 const (
@@ -58,6 +80,10 @@ func (h *Hosting) normalize() {
 	}
 	if h.AnonMode != peerclient.ModeMaximal {
 		h.AnonMode = peerclient.ModePartage
+	}
+	h.EntryURL = strings.TrimSpace(h.EntryURL)
+	if h.EntryRelay && strings.TrimSpace(h.EntryListen) == "" {
+		h.EntryListen = defaultEntryListen
 	}
 	seen := map[string]bool{}
 	var sites []string
@@ -103,7 +129,13 @@ func (n *Node) SetHosting(h Hosting) error {
 	n.mu.Lock()
 	n.hosting = h
 	c := n.client
+	viaVolunteer := n.entryVol
 	n.mu.Unlock()
+	if c != nil && viaVolunteer && (h.active() || !h.entryVolunteersOn()) {
+		// héberger, mode Maximal ou entrée bénévole refusée : relais officiel, reconnexion
+		_ = c.Close()
+		return nil
+	}
 	if c != nil {
 		go n.reconcile(context.Background(), c)
 	}
@@ -320,5 +352,6 @@ func (n *Node) learnRelays(ctx context.Context, c *peerclient.Client) bool {
 	}
 	b, _ := json.Marshal(urls)
 	_ = os.WriteFile(n.relaysPath(), b, 0o600)
+	n.learnEntries(ctx, c, cat)
 	return true
 }

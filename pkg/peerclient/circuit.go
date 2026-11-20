@@ -18,6 +18,7 @@ import (
 	"errors"
 	mrand "math/rand/v2"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -151,6 +152,12 @@ type volRelay struct {
 	family string
 	since  time.Time
 	exit   bool
+	url    string // adresse publique vérifiée (relais d'entrée possible), vide sinon
+}
+
+// isOfficial : clé d'un relais de la liste signée par la racine.
+func isOfficial(k ed25519.PublicKey, relays []RelayKey) bool {
+	return slices.ContainsFunc(relays, func(r RelayKey) bool { return r.Key.Equal(k) })
 }
 
 func (v volRelay) weight(now time.Time) float64 {
@@ -173,9 +180,21 @@ func (c *Client) buildCircuit(ctx context.Context) (*circuit, error) {
 	entry, exitOfficial := official[0], official[len(official)-1]
 	c.mu.Lock()
 	share := c.policy.VolunteerShare()
+	entryShare := c.policy.EntryShare()
+	banned := c.policy.Banned(hex.EncodeToString(entry))
 	c.mu.Unlock()
+	mode := c.anonMode()
+	if !isOfficial(entry, c.opt.Relays) {
+		// consignes (urgence, exclu, plus d'entrée bénévole) ou mode Maximal
+		// (entrée toujours officielle) : on quitte cette entrée bénévole
+		if share == 0 || entryShare == 0 || banned || mode == ModeMaximal {
+			go c.Close()
+			return nil, ErrNoCircuit
+		}
+		return c.buildFromVolunteerEntry(ctx, official[:2])
+	}
 	if share < 100 && mrand.IntN(100) >= share { // consignes : ce circuit reste sur les officiels
-		return c.buildPath(ctx, official)
+		return c.officialPath(ctx, official)
 	}
 	vs := c.usableVolunteers(ctx, official)
 	now := time.Now()
@@ -189,13 +208,12 @@ func (c *Client) buildCircuit(ctx context.Context) (*circuit, error) {
 		}
 		return nil, false
 	}
-	mode := c.opt.AnonMode
-	if c.opt.AnonModeFunc != nil {
-		mode = c.opt.AnonModeFunc()
-	}
 	if mode != ModeMaximal {
 		if v2, ok := pickWeighted(vs, now, func(v volRelay) bool { return v.exit }); ok {
-			if v1, ok := pickWeighted(vs, now, func(v volRelay) bool { return !v.key.Equal(v2.key) && v.family != v2.family }); ok {
+			// un bénévole au milieu ne joint qu'un bénévole PUBLIC (connexion à la
+			// demande) : une sortie cachée n'est reliée qu'aux relais officiels
+			v1, ok := pickWeighted(vs, now, func(v volRelay) bool { return !v.key.Equal(v2.key) && v.family != v2.family })
+			if ok && v2.url != "" {
 				if ci, ok := try([]ed25519.PublicKey{entry, v1.key, v2.key}, v1, v2); ok {
 					return ci, nil
 				}
@@ -209,7 +227,79 @@ func (c *Client) buildCircuit(ctx context.Context) (*circuit, error) {
 			return ci, nil
 		}
 	}
-	return c.buildPath(ctx, official)
+	return c.officialPath(ctx, official)
+}
+
+// buildFromVolunteerEntry : entrée par un relais bénévole PUBLIC E (il voit
+// l'adresse du membre, rien d'autre). Ensuite, de préférence :
+//   - mode Partagé : [E, X, Y] bénévoles publics de familles distinctes, Y sortie ;
+//     sinon [E, O, Y] (O officiel au milieu, relié à tous les bénévoles) ;
+//   - à défaut, et toujours en mode Maximal : [E, O], sortie officielle.
+func (c *Client) buildFromVolunteerEntry(ctx context.Context, official []ed25519.PublicKey) (*circuit, error) {
+	entry, o := official[0], official[1]
+	vs := c.usableVolunteers(ctx, official)
+	fam := ""
+	for _, v := range c.volunteers(ctx) {
+		if v.key.Equal(entry) {
+			fam = v.family
+		}
+	}
+	mode := c.anonMode()
+	now := time.Now()
+	other := func(v volRelay) bool { return !v.key.Equal(entry) && (fam == "" || v.family != fam) }
+	if mode != ModeMaximal {
+		y, ok := pickWeighted(vs, now, func(v volRelay) bool { return v.exit && other(v) })
+		if ok {
+			if x, ok := pickWeighted(vs, now, func(v volRelay) bool {
+				return v.url != "" && other(v) && !v.key.Equal(y.key) && v.family != y.family
+			}); ok && y.url != "" {
+				if ci, err := c.buildPath(ctx, []ed25519.PublicKey{entry, x.key, y.key}); err == nil {
+					return ci, nil
+				}
+				c.badVolunteer(x.key)
+				c.badVolunteer(y.key)
+			} else if ci, err := c.buildPath(ctx, []ed25519.PublicKey{entry, o, y.key}); err == nil {
+				return ci, nil
+			} else {
+				c.badVolunteer(y.key)
+			}
+		}
+	}
+	return c.officialPath(ctx, []ed25519.PublicKey{entry, o})
+}
+
+// anonMode : mode d'anonymat en vigueur (réglage modifiable à chaud).
+func (c *Client) anonMode() string {
+	if c.opt.AnonModeFunc != nil {
+		return c.opt.AnonModeFunc()
+	}
+	return c.opt.AnonMode
+}
+
+// officialPath : circuit par les relais officiels keys ; si l'un d'eux est en
+// panne (circuit refusé), on se replie sur [entrée, autre officiel], chacun
+// des autres essayé à son tour : un officiel arrêté ne doit pas priver les
+// membres de service (le tirage de path le place sinon dans presque tous les
+// circuits quand la liste ne compte que trois relais).
+func (c *Client) officialPath(ctx context.Context, keys []ed25519.PublicKey) (*circuit, error) {
+	ci, err := c.buildPath(ctx, keys)
+	if err == nil || ctx.Err() != nil {
+		return ci, err
+	}
+	o := others(keys[0], c.opt.Relays)
+	mrand.Shuffle(len(o), func(i, j int) { o[i], o[j] = o[j], o[i] })
+	for _, k := range o {
+		if len(keys) == 2 && k.Equal(keys[1]) {
+			continue // déjà essayé
+		}
+		if ci, e := c.buildPath(ctx, []ed25519.PublicKey{keys[0], k}); e == nil {
+			return ci, nil
+		}
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return nil, err
 }
 
 // pickWeighted : tirage au hasard pondéré par l'ancienneté.
@@ -234,8 +324,14 @@ func pickWeighted(vs []volRelay, now time.Time, ok func(volRelay) bool) (volRela
 	return cand[len(cand)-1], true
 }
 
-// volunteers : relais bénévoles annoncés par le relais d'entrée (liste signée
-// par lui, revérifiée ; mise en cache 2 minutes).
+// volunteers : annuaire des relais bénévoles (liste signée par un relais
+// officiel de la liste racine, revérifiée ; mise en cache 2 minutes).
+//
+// Il n'est PAS demandé au relais d'entrée (qui choisirait alors quelle liste
+// signée, encore valable, nous montrer) : en mode anonyme, il est demandé par
+// le circuit à une SORTIE OFFICIELLE. Demande directe seulement pour amorcer,
+// sans circuit encore, et seulement à un relais d'entrée officiel ; une entrée
+// bénévole sans circuit n'en sert aucun (premier circuit : officiels seulement).
 func (c *Client) volunteers(ctx context.Context) []volRelay {
 	c.mu.Lock()
 	if time.Since(c.volAt) < 2*time.Minute {
@@ -243,17 +339,40 @@ func (c *Client) volunteers(ctx context.Context) []volRelay {
 		c.mu.Unlock()
 		return v
 	}
+	cached := c.vols
 	c.mu.Unlock()
 	var out []volRelay
 	vctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	if b, err := c.get(vctx, wire.KindVolunteers, "", 0); err == nil {
+	req := &wire.Frame{T: wire.TGet, H: wire.Header{Kind: wire.KindVolunteers}}
+	var r *wire.Frame
+	var err error
+	ci := c.currentCircuit()
+	switch {
+	case c.opt.Anonymous && ci != nil:
+		if !isOfficial(ci.keys[len(ci.keys)-1], c.opt.Relays) {
+			return cached // sortie bénévole : on attend un circuit à sortie officielle
+		}
+		r, err = c.requestVia(vctx, req, true)
+	case len(c.opt.EntryKey) > 0 && !isOfficial(c.opt.EntryKey, c.opt.Relays):
+		return nil // entrée bénévole, pas encore de circuit : jamais sa liste à elle
+	default:
+		r, err = c.requestVia(vctx, req, false)
+	}
+	if err == nil {
 		var vl trust.VolunteerList
-		if json.Unmarshal(b, &vl) == nil && vl.Relay == hex.EncodeToString(c.opt.EntryKey) &&
-			vl.Verify(c.opt.EntryKey, time.Now()) == nil {
+		var signer ed25519.PublicKey
+		if json.Unmarshal(r.Data, &vl) == nil {
+			signer, _ = trust.ParsePublicKey(vl.Relay)
+		}
+		if signer != nil && isOfficial(signer, c.opt.Relays) && vl.Verify(signer, time.Now()) == nil {
 			for _, e := range vl.Volunteers {
 				if pk, err := trust.ParsePublicKey(e.Key); err == nil {
-					out = append(out, volRelay{key: pk, family: e.Family, since: time.Unix(e.Since, 0), exit: e.Exit})
+					v := volRelay{key: pk, family: e.Family, since: time.Unix(e.Since, 0), exit: e.Exit}
+					if strings.HasPrefix(e.URL, "ws://") || strings.HasPrefix(e.URL, "wss://") {
+						v.url = e.URL
+					}
+					out = append(out, v)
 				}
 			}
 		}
@@ -273,11 +392,34 @@ func (c *Client) usableVolunteers(ctx context.Context, official []ed25519.Public
 	var out []volRelay
 	for _, v := range vs {
 		k := hex.EncodeToString(v.key)
-		if v.key.Equal(c.opt.AvoidRelay) || c.volBad[k].After(time.Now()) || c.policy.Banned(k) ||
+		if v.key.Equal(c.opt.AvoidRelay) || v.key.Equal(c.opt.EntryKey) || c.volBad[k].After(time.Now()) || c.policy.Banned(k) ||
 			slices.ContainsFunc(official, func(k ed25519.PublicKey) bool { return k.Equal(v.key) }) {
 			continue
 		}
 		out = append(out, v)
+	}
+	return out
+}
+
+// PublicVolunteer : relais bénévole qui accepte d'être relais d'entrée
+// (adresse publique vérifiée par un relais officiel).
+type PublicVolunteer struct {
+	Key    ed25519.PublicKey
+	URL    string
+	Family string
+	Since  time.Time
+}
+
+// PublicVolunteers : relais d'entrée bénévoles de l'annuaire signé (hors exclus).
+func (c *Client) PublicVolunteers(ctx context.Context) []PublicVolunteer {
+	var out []PublicVolunteer
+	vs := c.volunteers(ctx)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, v := range vs {
+		if v.url != "" && !c.policy.Banned(hex.EncodeToString(v.key)) && c.policy.VolunteerShare() > 0 && c.policy.EntryShare() > 0 {
+			out = append(out, PublicVolunteer{Key: v.key, URL: v.url, Family: v.family, Since: v.since})
+		}
 	}
 	return out
 }
@@ -419,6 +561,9 @@ func (c *Client) circuitLoop() {
 			return
 		case <-t.C:
 		case <-dead:
+			if c.currentCircuit() != nil {
+				continue // déjà remplacé (RenewCircuit)
+			}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		if nc, err := c.buildCircuit(ctx); err == nil {
@@ -426,6 +571,22 @@ func (c *Client) circuitLoop() {
 		}
 		cancel()
 	}
+}
+
+// RenewCircuit : bâtit tout de suite un nouveau circuit (nouveau pseudonyme)
+// et remplace l'actuel. Le premier circuit d'une entrée bénévole ne passe que
+// par des officiels (son annuaire n'est jamais demandé à l'entrée) ; les
+// suivants peuvent prendre des bénévoles appris par le circuit.
+func (c *Client) RenewCircuit(ctx context.Context) error {
+	if !c.opt.Anonymous {
+		return ErrNoCircuit
+	}
+	ci, err := c.buildCircuit(ctx)
+	if err != nil {
+		return err
+	}
+	c.installCircuit(ci)
+	return nil
 }
 
 // onCircuitFrame : trames de circuit reçues du relais d'entrée.
@@ -464,7 +625,7 @@ func (c *Client) onCircuitFrame(f *wire.Frame) {
 			}
 		case onion.CmdFrame:
 			if inner, err := wire.Decode(p[1:]); err == nil {
-				c.handle(inner)
+				c.handle(inner, true)
 			}
 		}
 	}

@@ -193,7 +193,30 @@ async function pollStatus() {
     const anon = s.status === 'running' && s.connected && s.anonymous;
     $('anonPill').hidden = !anon;
     $('anonPill').title = anon ? `Tes demandes traversent ${s.circuitHops} relais : aucun ne connaît à la fois ton adresse et ce que tu consultes.` : '';
+    renderUpdate(s.version);
     if (!$('home').hidden) renderStatusDetails(s);
+}
+
+// renderUpdate : bannière de l'avis de version (texte uniquement : notes en textContent).
+function renderUpdate(v) {
+    const banner = $('updateBanner');
+    const level = v && v.level;
+    if (!level || level === 'ok') { banner.hidden = true; return; }
+    const msg = {
+        available: `Version ${v.latest} disponible (tu as ${v.current}).`,
+        important: `Mise à jour importante : version ${v.latest} (tu as ${v.current}). Installe-la dès que possible.`,
+        obsolete: `Cette version (${v.current}) n'est plus acceptée par le réseau : les relais refusent la connexion. Installe la dernière version${v.latest ? ' (' + v.latest + ')' : ''} pour continuer.`,
+    }[level];
+    if (!msg) { banner.hidden = true; return; }
+    banner.className = 'update-banner ' + level;
+    $('updateText').textContent = msg + (v.notes ? ' ' + v.notes : '');
+    $('btnUpdate').hidden = !v.url;
+    banner.hidden = false;
+}
+
+async function openUpdate() {
+    const r = await api('/api/update/open', { method: 'POST' });
+    if (!r.ok) $('updateText').textContent += ' (impossible d\'ouvrir la page : ' + (r.error || '?') + ')';
 }
 
 function renderStatusDetails(s) {
@@ -298,6 +321,14 @@ async function loadHosting() {
     $('relayKbs').value = r.hosting.relay_kbs;
     $('chkRelayExit').checked = r.hosting.relay_exit !== false;
     $('anonMode').value = r.hosting.anon_mode || 'partage';
+    $('chkEntryVol').checked = r.hosting.entry_volunteers !== false && $('anonMode').value !== 'maximal';
+    $('chkEntryVol').disabled = $('anonMode').value === 'maximal';
+    $('chkEntry').checked = !!r.hosting.entry_relay;
+    $('entryListen').value = r.hosting.entry_listen || '';
+    $('entryUrl').value = r.hosting.entry_url || '';
+    $('entryState').textContent = !r.hosting.entry_relay ? '' : (r.entryVerified
+        ? 'Vérifié : joignable, présent dans l\'annuaire signé.'
+        : (r.entryRelay ? 'En attente de vérification par un relais officiel…' : 'Inactif (adresse manquante ou écoute impossible).'));
     $('relayState').textContent = r.hiddenRelay
         ? `Actif : relié à ${r.relayLinks} relais officiel${r.relayLinks > 1 ? 's' : ''}.`
         : ($('chkRelay').checked ? 'Démarrage…' : 'Désactivé.');
@@ -331,6 +362,10 @@ async function saveHosting(off) {
         relay_kbs: Number($('relayKbs').value) || 0,
         relay_exit: $('chkRelayExit').checked,
         anon_mode: $('anonMode').value,
+        entry_volunteers: $('anonMode').value === 'maximal' ? state.hosting?.entry_volunteers !== false : $('chkEntryVol').checked,
+        entry_relay: $('chkEntry').checked,
+        entry_listen: $('entryListen').value.trim(),
+        entry_url: $('entryUrl').value.trim(),
     };
     const r = await api('/api/hosting', { method: 'POST', body });
     $('hostSaved').textContent = r.ok ? (off ? 'Bénévolat arrêté, copies supprimées.' : 'Enregistré : les copies se mettent à jour.') : 'Erreur : ' + (r.error || '');
