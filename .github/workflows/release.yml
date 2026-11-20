@@ -2,7 +2,8 @@
 # minutes illimitées). GitLab ne lance aucun pipeline : il reçoit le code
 # (mirror-gitlab.yml) et les fichiers générés (job « gitlab » ci-dessous).
 #
-# Déclenchement : pousser un tag vX.Y.Z, ou « Run workflow » avec un tag.
+# Déclenchement : pousser un tag vX.Y.Z, ou « Run workflow » avec un tag
+# EXISTANT (le code compilé est celui du tag, jamais celui d'une branche).
 # Réglages du dépôt GitHub (Settings → Secrets and variables → Actions) :
 #   variable T2C_ROOT_PUBKEY : clé publique racine (sortie de `t2c-serv init`) — obligatoire
 #   secret   GITLAB_TOKEN    : jeton GitLab (scopes api + write_repository) — optionnel
@@ -15,9 +16,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag à publier (ex. v2.0.0)"
+        description: "Tag existant à publier (ex. v2.0.0)"
         required: true
-        default: v0.0.0-essai
       dry_run:
         description: "Essai à blanc : compile tout, ne publie rien (clé racine facultative)"
         type: boolean
@@ -29,12 +29,23 @@ permissions:
 env:
   WAILS_VERSION: v2.17.1
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  # code compilé : toujours le tag (lancement manuel compris)
+  SRC_REF: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
+  # clé publique racine attendue (versionnée ici) : la variable du dépôt doit
+  # lui être identique, sinon pas de release
+  EXPECTED_ROOT: 985c6d08ed885e08d69611f861595b7d4d6ae7a11a0cfc4c6a7f8267fa2d984f
   DRY_RUN: ${{ github.event.inputs.dry_run == 'true' }}
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - name: Tag existant
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9A-Za-z.+-]+$ ]]; then echo "::error::tag invalide : $TAG"; exit 1; fi
+          gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" > /dev/null || { echo "::error::le tag $TAG n'existe pas"; exit 1; }
       - name: Clé racine présente
         env:
           ROOT: ${{ vars.T2C_ROOT_PUBKEY }}
@@ -42,6 +53,10 @@ jobs:
           if [ "$DRY_RUN" = true ]; then echo "::notice::essai à blanc : aucune publication"; exit 0; fi
           if ! [[ "$ROOT" =~ ^[0-9a-f]{64}$ ]]; then
             echo "::error::Variable T2C_ROOT_PUBKEY absente ou invalide (64 caractères hex attendus)"
+            exit 1
+          fi
+          if [ "$ROOT" != "$EXPECTED_ROOT" ]; then
+            echo "::error::T2C_ROOT_PUBKEY différente de la clé racine versionnée (EXPECTED_ROOT)"
             exit 1
           fi
 
@@ -64,10 +79,14 @@ jobs:
             tags: webkit2_41
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Dépôt du relais (cloné à côté, comme en local)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+          ref: ${{ env.SRC_REF }}
+      - name: Dépôt du relais (cloné à côté, comme en local)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
           repository: TUTODECODE-FR/T2C-Phantom-relay
           path: .t2c-relay
           token: ${{ secrets.RELAY_REPO_TOKEN || github.token }}
@@ -75,7 +94,7 @@ jobs:
         shell: bash
         run: mv .t2c-relay ../T2C-Phantom-relay
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
           cache-dependency-path: |
@@ -114,7 +133,7 @@ jobs:
         if: runner.os == 'Linux'
         run: tar czf "T2C-Phantom-${{ matrix.name }}.tar.gz" -C desktop/build/bin T2C-Phantom
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: app-${{ matrix.name }}
           path: T2C-Phantom-${{ matrix.name }}.*
@@ -125,17 +144,21 @@ jobs:
     name: CLI (t2c, t2c-peer)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Dépôt du relais (cloné à côté, comme en local)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+          ref: ${{ env.SRC_REF }}
+      - name: Dépôt du relais (cloné à côté, comme en local)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
           repository: TUTODECODE-FR/T2C-Phantom-relay
           path: .t2c-relay
           token: ${{ secrets.RELAY_REPO_TOKEN || github.token }}
       - name: Relais à côté du dépôt
         shell: bash
         run: mv .t2c-relay ../T2C-Phantom-relay
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
       - name: Tests
@@ -155,7 +178,7 @@ jobs:
             done
             if [ "$os" = windows ]; then zip -qr "dist/$out.zip" "$out"; else tar czf "dist/$out.tar.gz" "$out"; fi
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli
           path: dist/*
@@ -166,8 +189,10 @@ jobs:
     name: Notes de version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
+          ref: ${{ env.SRC_REF }}
           fetch-depth: 0 # historique et tags complets : comparaison avec la version précédente
       - name: Ancien vs nouveau
         run: |
@@ -175,7 +200,7 @@ jobs:
           bash .github/scripts/release-notes.sh "$TAG" "$GITHUB_REPOSITORY" > notes/notes.md
           cat notes/notes.md >> "$GITHUB_STEP_SUMMARY"
           cat notes/notes.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-notes
           path: notes/notes.md
@@ -187,12 +212,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: "{app-*,cli}"
           path: out
           merge-multiple: true
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-notes
           path: notes
@@ -210,7 +235,7 @@ jobs:
             gh release create "$TAG" out/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "T2C Phantom $TAG" --notes-file notes/notes.md
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-files
           path: out/*
@@ -227,12 +252,12 @@ jobs:
         run: |
           if [ -n "$GITLAB_TOKEN" ] && [ -n "$GITLAB_PROJECT" ]; then echo "on=1" >> "$GITHUB_OUTPUT";
           else echo "::notice::GITLAB_TOKEN / GITLAB_PROJECT absents : publication GitLab ignorée"; fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: steps.cfg.outputs.on
         with:
           name: release-files
           path: out
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: steps.cfg.outputs.on
         with:
           name: release-notes

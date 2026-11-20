@@ -31,7 +31,15 @@ const DefaultRelay = "wss://t2cphantom.eu.org/v1/ws"
 // DefaultRelays : relais essayés dans l'ordre. La liste signée (hosts.json,
 // champ bootstrap) reçue à chaque connexion s'y ajoute : plusieurs relais
 // peuvent se partager le réseau.
-var DefaultRelays = []string{DefaultRelay, "wss://185-233-100-85.sslip.io/v1/ws"}
+//
+// Chaque entrée porte la clé du relais (#k=) : dès le premier lancement, avant
+// d'avoir reçu la liste signée, l'app peut bâtir un circuit vers des relais
+// authentifiés (mode anonyme dès la première connexion). DefaultRelay
+// (t2cphantom.eu.org) n'y figure pas tant que le domaine n'est pas actif.
+var DefaultRelays = []string{
+	"wss://185-233-100-85.sslip.io/v1/ws#k=6af6fbbda7a10ff3888f86965eb620a793a3d762a90356eec2705cd8addc9e03",
+	"wss://t2c-phantom-relay.tail5d8974.ts.net/v1/ws#k=a05821eb76f2104572cadb4322cf35942d0fd1e2a526a1befeaecd9ad3103ede",
+}
 
 type Config struct {
 	RelayURL  string // relais préféré (essayé en premier)

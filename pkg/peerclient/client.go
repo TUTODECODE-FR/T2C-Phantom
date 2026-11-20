@@ -83,6 +83,7 @@ type Client struct {
 	volAt     time.Time
 	volBad    map[string]time.Time // bénévoles qui n'ont pas répondu (évités 30 min)
 	policy    *trust.NetworkPolicy // consignes réseau du dernier catalogue vérifié
+	rootList  *trust.RelayList     // liste racine du dernier catalogue (clés de service révoquées)
 }
 
 // pendingReq : requête en attente de réponse. Une réponse n'est acceptée que
@@ -398,6 +399,9 @@ func (c *Client) Catalog(ctx context.Context) (*trust.Catalog, error) {
 		if err := c.guard.Accept("relays", cat.Relays.Version); err != nil {
 			return nil, err
 		}
+		c.mu.Lock()
+		c.rootList = cat.Relays
+		c.mu.Unlock()
 	}
 	if cat.Versions != nil {
 		if err := c.guard.Accept("versions", cat.Versions.Version); err != nil {
@@ -429,6 +433,13 @@ func (c *Client) Catalog(ctx context.Context) (*trust.Catalog, error) {
 	return &cat, nil
 }
 
+// revokedList : liste racine la plus récente vue (nil avant le premier catalogue).
+func (c *Client) revokedList() *trust.RelayList {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.rootList
+}
+
 // Hosts : liste signée des bénévoles / bannis (nil si l'origine n'en publie pas encore).
 func (c *Client) Hosts(ctx context.Context) (*trust.HostsList, error) {
 	b, err := c.get(ctx, wire.KindHosts, "", 0)
@@ -439,10 +450,12 @@ func (c *Client) Hosts(ctx context.Context) (*trust.HostsList, error) {
 	if err := json.Unmarshal(b, &h); err != nil {
 		return nil, err
 	}
-	if err := h.Verify(c.opt.RootKey); err != nil {
+	if err := h.VerifyNotRevoked(c.opt.RootKey, c.revokedList()); err != nil {
 		return nil, err
 	}
-	return &h, c.guard.Accept("hosts", h.Version)
+	// anti-retour par signataire (comme les consignes) : une clé révoquée qui
+	// aurait publié une version énorme ne bloque pas la nouvelle clé
+	return &h, c.guard.Accept("hosts:"+h.Signer(), h.Version)
 }
 
 func (c *Client) Manifest(ctx context.Context, root string) (*trust.Manifest, error) {
@@ -848,7 +861,7 @@ func (c *Client) Host(ctx context.Context, site string) (*trust.Ticket, error) {
 		return nil, err
 	}
 	t := r.H.Ticket
-	if t == nil || t.Verify(c.opt.RootKey) != nil || t.Peer != c.ID() || !t.Valid(time.Now()) {
+	if t == nil || t.VerifyNotRevoked(c.opt.RootKey, c.revokedList()) != nil || t.Peer != c.ID() || !t.Valid(time.Now()) {
 		return nil, errors.New("ticket invalide")
 	}
 	if c.opt.Store.Manifest(t.Root) == nil {

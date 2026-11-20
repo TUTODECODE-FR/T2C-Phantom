@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,17 @@ type Server struct {
 
 // StartProxyServer démarre le proxy sur listenAddr (bloquant).
 func StartProxyServer(n Sites, listenAddr string) error {
+	ln, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return err
+	}
+	return ServeProxy(n, ln)
+}
+
+// ServeProxy : proxy sur un port déjà ouvert (l'appelant sait ainsi, avant
+// d'activer le PAC, que le port est bien à T2C et pas à un autre programme).
+func ServeProxy(n Sites, ln net.Listener) error {
+	listenAddr := ln.Addr().String()
 	s := &Server{Node: n, Addr: listenAddr}
 	ca, err := assohttps.LoadOrCreate()
 	if err != nil {
@@ -55,7 +67,7 @@ func StartProxyServer(n Sites, listenAddr string) error {
 		MaxHeaderBytes:    32 << 10,
 	}
 	fmt.Printf("Proxy T2C sur http://%s\n", listenAddr)
-	return srv.ListenAndServe()
+	return srv.Serve(ln)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {

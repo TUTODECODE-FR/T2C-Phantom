@@ -261,11 +261,16 @@ func (n *Node) relayCandidates() []string {
 	return out
 }
 
-// relayKeys : relais de la liste signée avec leur clé (pour bâtir des circuits).
+// relayKeys : relais de la liste signée avec leur clé (pour bâtir des circuits) ;
+// avant la première liste reçue : les relais par défaut intégrés à l'app (sauf
+// relais choisi explicitement, par exemple un banc de test local).
 func (n *Node) relayKeys() []peerclient.RelayKey {
 	var learned []string
 	if b, err := os.ReadFile(n.relaysPath()); err == nil {
 		_ = json.Unmarshal(b, &learned)
+	}
+	if len(learned) == 0 && (n.cfg.RelayURL == "" || n.cfg.RelayURL == DefaultRelay) {
+		learned = DefaultRelays // seulement pour l'app réglée sur les relais par défaut
 	}
 	var out []peerclient.RelayKey
 	for _, e := range learned {
@@ -329,6 +334,23 @@ func (n *Node) upgradeToAnonymous(c *peerclient.Client) {
 	}
 }
 
+// keyedRelays : entrées utilisables de la liste racine (« url#k=clé » : la
+// clé sert aux circuits anonymes). Toute entrée doit épingler la clé du
+// relais : sans elle, elle est ignorée. Relais caché (« hidden:nom#k=clé ») :
+// jamais contacté, seulement utilisé dans les circuits.
+func keyedRelays(entries []string) []string {
+	var urls []string
+	for _, u := range entries {
+		base, _, _ := strings.Cut(u, "#")
+		_, keyed := trust.RelayEntryKey(u)
+		usable := keyed && (validRelay(base) || strings.HasPrefix(base, "hidden:"))
+		if usable && len(urls) < 16 && !slices.Contains(urls, u) {
+			urls = append(urls, u)
+		}
+	}
+	return urls
+}
+
 // learnRelays retient les relais officiels : uniquement la liste signée par la
 // clé racine (catalogue), jamais celle du serveur (hosts.json). Un serveur
 // piraté ne peut donc pas glisser de relais espions dans les circuits.
@@ -341,14 +363,7 @@ func (n *Node) learnRelays(ctx context.Context, c *peerclient.Client) bool {
 	}
 	var urls []string
 	if cat.Relays != nil {
-		for _, u := range cat.Relays.Relays { // « url#k=clé » : la clé sert aux circuits anonymes
-			base, _, _ := strings.Cut(u, "#")
-			// relais caché (« hidden:nom#k=clé ») : jamais contacté, seulement utilisé dans les circuits
-			usable := validRelay(base) || (strings.HasPrefix(base, "hidden:") && strings.Contains(u, "#k="))
-			if usable && len(urls) < 16 && !slices.Contains(urls, u) {
-				urls = append(urls, u)
-			}
-		}
+		urls = keyedRelays(cat.Relays.Relays)
 	}
 	b, _ := json.Marshal(urls)
 	_ = os.WriteFile(n.relaysPath(), b, 0o600)

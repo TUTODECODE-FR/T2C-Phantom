@@ -17,6 +17,9 @@ import (
 // preuve de travail plus dure, relais exclus, moins de bénévoles). Elle ne
 // peut jamais forcer un bénévole à faire sortie ni relever un plafond local :
 // une clé de service volée ne peut que ralentir le réseau, pas désanonymiser.
+// Elle peut toutefois exclure des bénévoles pour orienter le trafic vers les
+// autres : une consigne DÉLÉGUÉE exclut donc au plus MaxDelegatedBans relais ;
+// au-delà, seule la racine (hors ligne) peut signer.
 //
 // Elle expire (MaxPolicyTTL au plus) : si le serveur maison tombe, plafonds et
 // pourcentages reviennent aux réglages par défaut, mais les relais exclus et le
@@ -34,7 +37,10 @@ const ScopePolicy = "policy"
 const (
 	MaxPolicyTTL  = 30 * 24 * time.Hour
 	MaxPolicyBans = 1024
-	maxPolicyBits = 40
+	// MaxDelegatedBans : exclusions max d'une consigne signée par une clé de
+	// service (au-delà : racine seulement).
+	MaxDelegatedBans = 64
+	maxPolicyBits    = 40
 )
 
 type NetworkPolicy struct {
@@ -86,6 +92,9 @@ func (p *NetworkPolicy) Verify(root ed25519.PublicKey, now time.Time) error {
 		p.EntryPercent < 0 || p.EntryPercent > 100 {
 		return bad
 	}
+	if p.Deleg != nil && len(p.BannedRelays) > MaxDelegatedBans {
+		return errors.New("trust: trop d'exclusions pour une clé de service (racine requise)")
+	}
 	for _, k := range p.BannedRelays {
 		if b, err := hex.DecodeString(k); err != nil || len(b) != ed25519.PublicKeySize || k != hex.EncodeToString(b) {
 			return bad
@@ -132,17 +141,15 @@ func (k *PolicyKeeper) Keep(p *NetworkPolicy) *NetworkPolicy {
 // Signer : clé qui a signé (hex de la clé de service, ou « root »). Sert à
 // l'anti-retour par signataire : une clé révoquée qui aurait publié une
 // version énorme ne bloque pas les consignes de la nouvelle clé.
-func (p *NetworkPolicy) Signer() string {
-	if p.Deleg == nil {
-		return "root"
-	}
-	return p.Deleg.Key
-}
+func (p *NetworkPolicy) Signer() string { return delegSigner(p.Deleg) }
 
 // revoked : la clé de service est révoquée par la liste racine.
 func (r *RelayList) revoked(key string) bool {
 	return r != nil && key != "root" && slices.Contains(r.Revoked, key)
 }
+
+// Revokes : version exportée de revoked (relais, serveur).
+func (r *RelayList) Revokes(key string) bool { return r.revoked(key) }
 
 // live : consignes encore valides (une copie en cache peut avoir expiré).
 // Toutes les méthodes ci-dessous acceptent un récepteur nil (aucune consigne).

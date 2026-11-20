@@ -76,6 +76,14 @@ func (d *Dashboard) APIHandler() http.Handler {
 	return mux
 }
 
+// CleanStaleProxy : au lancement, retire un PAC resté actif après un arrêt
+// brutal de l'app (proxy absent). Il est remis dès que le proxy tourne.
+func (d *Dashboard) CleanStaleProxy() {
+	if sysint.CleanStale(utils.GetT2CDataDir(), fmt.Sprintf("127.0.0.1:%d", proxyPort)) {
+		fmt.Println("réglage proxy d'un arrêt brutal retiré (PAC sans proxy)")
+	}
+}
+
 // Shutdown arrête la connexion au relais (fermeture de l'application).
 func (d *Dashboard) Shutdown() {
 	d.mu.Lock()
@@ -98,29 +106,38 @@ func (d *Dashboard) Start(port int) error {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	fmt.Printf("\n=== T2C Dashboard ===\nInterface : http://%s\n=====================\n\n", addr)
 
-	// anti DNS-rebinding : seul l'hôte local exact est accepté.
-	// anti CSRF : une page web ouverte dans le navigateur ne doit pas pouvoir
-	// piloter l'app (POST/DELETE depuis une autre origine refusés).
-	local := map[string]bool{"http://" + addr: true, fmt.Sprintf("http://localhost:%d", port): true}
-	guard := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Host != addr && r.Host != fmt.Sprintf("localhost:%d", port) {
-				http.Error(w, "Forbidden: Invalid Host", http.StatusForbidden)
-				return
-			}
-			if !crossSiteSafe(r, local) {
-				http.Error(w, "Forbidden: cross-site", http.StatusForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
+	d.CleanStaleProxy()
 	srv := &http.Server{
-		Addr: addr, Handler: guard(mux),
+		Addr: addr, Handler: localGuard(port, mux),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
 		WriteTimeout: 30 * time.Second, IdleTimeout: 30 * time.Second,
 	}
 	return srv.ListenAndServe()
+}
+
+// localGuard : protections du tableau de bord servi au navigateur.
+//   - anti DNS-rebinding : seul l'hôte local exact est accepté ;
+//   - anti CSRF : une page web ouverte dans le navigateur ne doit ni piloter
+//     l'app ni lire son état (/api/* refusé depuis une autre origine) ;
+//   - anti incrustation : l'interface ne s'affiche jamais dans un cadre.
+func localGuard(port int, next http.Handler) http.Handler {
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	alt := fmt.Sprintf("localhost:%d", port)
+	local := map[string]bool{"http://" + addr: true, "http://" + alt: true}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		if r.Host != addr && r.Host != alt {
+			http.Error(w, "Forbidden: Invalid Host", http.StatusForbidden)
+			return
+		}
+		if !crossSiteSafe(r, local) {
+			http.Error(w, "Forbidden: cross-site", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -222,7 +239,7 @@ func (d *Dashboard) handleStartClient(w http.ResponseWriter, r *http.Request) {
 	d.volunteer = n.Status().Volunteer
 	d.ensureProxyLocked()
 	// plug-and-play : si l'utilisateur a déjà accepté la configuration, on remet le PAC
-	if sysint.Enabled(utils.GetT2CDataDir()) && os.Getenv("T2C_NO_BROWSER_SETUP") == "" {
+	if d.proxyOn && sysint.Enabled(utils.GetT2CDataDir()) && os.Getenv("T2C_NO_BROWSER_SETUP") == "" {
 		go sysint.Reapply(utils.GetT2CDataDir(), fmt.Sprintf("127.0.0.1:%d", proxyPort))
 	}
 	writeJSON(w, map[string]any{"success": true, "address": n.ID(), "seeding": d.volunteer, "role": "pair"})
@@ -239,9 +256,16 @@ func (d *Dashboard) ensureProxyLocked() {
 	if d.proxyOn {
 		return
 	}
+	// port ouvert tout de suite : s'il est pris par un autre programme, le
+	// PAC n'est pas activé (il lui enverrait les .t2c)
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", proxyPort))
+	if err != nil {
+		fmt.Println("proxy:", err)
+		return
+	}
 	d.proxyOn = true
 	go func() {
-		if err := proxy.StartProxyServer(&nodeRef{d: d}, fmt.Sprintf("127.0.0.1:%d", proxyPort)); err != nil {
+		if err := proxy.ServeProxy(&nodeRef{d: d}, ln); err != nil {
 			fmt.Println("proxy:", err)
 			d.mu.Lock()
 			d.proxyOn = false
@@ -251,6 +275,10 @@ func (d *Dashboard) ensureProxyLocked() {
 }
 
 func (d *Dashboard) handleStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST attendu", http.StatusMethodNotAllowed)
+		return
+	}
 	d.mu.Lock()
 	n := d.node
 	d.node = nil
@@ -525,7 +553,7 @@ func (d *Dashboard) handleNetwork(w http.ResponseWriter, r *http.Request) {
 		"seeding": st.Volunteer, "hopRelay": false,
 		"sites": local, "hostedSites": hosted, "remoteCatalog": d.catalogSites(ctx), "seeders": seeders,
 		"polledAt": time.Now().UTC().Format(time.RFC3339),
-		"note":     "Identité = clé aléatoire. Seul Cloudflare voit ton IP ; le relais, l'origine et les autres pairs ne voient que ta clé.",
+		"note":     "Identité = clé aléatoire. Ton adresse IP est vue par le relais d'entrée (et son hébergeur ou tunnel) ; l'origine et les autres pairs ne voient que ta clé.",
 		"assoCA": map[string]any{
 			"display": fp != "", "fingerprintSha256": fp, "pem": caPEM,
 			"note": "CA générée sur ta machine ; elle ne signe que les sites du catalogue signé",
@@ -543,10 +571,12 @@ func LoadCarnet(path string) map[string]string {
 	return m
 }
 
-// crossSiteSafe : lectures toujours permises ; toute action (POST, DELETE…)
-// doit venir de l'interface elle-même, jamais d'un autre site.
+// crossSiteSafe : les fichiers de l'interface se lisent librement ; tout
+// /api/* (lecture comprise : l'état révèle l'identité, les sites hébergés…)
+// et toute action doivent venir de l'interface elle-même, jamais d'un autre
+// site. Un outil local sans en-têtes de navigateur (curl) reste accepté.
 func crossSiteSafe(r *http.Request, local map[string]bool) bool {
-	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+	if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !strings.HasPrefix(r.URL.Path, "/api/") {
 		return true
 	}
 	if s := r.Header.Get("Sec-Fetch-Site"); s == "cross-site" || s == "same-site" {

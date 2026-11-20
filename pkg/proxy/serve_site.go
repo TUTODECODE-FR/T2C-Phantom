@@ -19,6 +19,12 @@ import (
 // serveSite : sert le site .t2c depuis le dossier local (téléchargé chez les
 // bénévoles via le relais, chaque morceau vérifié contre le manifeste signé).
 func (s *Server) serveSite(w http.ResponseWriter, req *http.Request, domain string) {
+	setSiteHeaders(w.Header())
+	// page du web ouvert qui sonde le proxy : refus avant tout travail
+	if crossSiteProbe(req) {
+		refuseProbe(w, req)
+		return
+	}
 	// sites statiques : lecture seule
 	if req.Method != http.MethodGet && req.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -49,7 +55,6 @@ func (s *Server) serveSite(w http.ResponseWriter, req *http.Request, domain stri
 	}
 	w.Header().Set("X-T2C-Root", e.Root)
 	w.Header().Set("X-T2C-Verified", "manifest-signed")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if st, ok := hfs.(streamer); ok && !hiddenPath(req.URL.Path) {
 		if rc, size, ok := st.Stream(req.URL.Path); ok {
 			// gros fichier : envoyé au fil de l'eau, taille annoncée (barre de progression)

@@ -31,6 +31,17 @@ type RelayList struct {
 	Sig     string   `json:"sig"`
 }
 
+// RelayEntryKey : clé épinglée d'une entrée « …#k=<hex> » (false sans clé
+// valide : l'entrée doit alors être ignorée).
+func RelayEntryKey(e string) (ed25519.PublicKey, bool) {
+	_, frag, ok := strings.Cut(e, "#")
+	if !ok || !strings.HasPrefix(frag, "k=") {
+		return nil, false
+	}
+	k, err := ParsePublicKey(strings.TrimPrefix(frag, "k="))
+	return k, err == nil
+}
+
 func (r *RelayList) Sign(root ed25519.PrivateKey) error {
 	u := *r
 	u.Sig = ""

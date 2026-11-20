@@ -1,0 +1,16 @@
+# Mises à jour proposées (jamais fusionnées seules) : actions GitHub épinglées
+# par empreinte de commit, et modules Go de l'app et de l'app de bureau.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /desktop
+    schedule:
+      interval: weekly

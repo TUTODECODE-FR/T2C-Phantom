@@ -8,15 +8,22 @@ on:
   push:
     branches: [ "main" ]
 
+# jeton en lecture seule par défaut (écriture seulement là où il le faut)
+permissions:
+  contents: read
+
 jobs:
   scan:
     name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Dépôt du relais (cloné à côté, comme en local)
-      uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
+        persist-credentials: false
+    - name: Dépôt du relais (cloné à côté, comme en local)
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
         repository: TUTODECODE-FR/T2C-Phantom-relay
         path: .t2c-relay
         token: ${{ secrets.RELAY_REPO_TOKEN || github.token }}
@@ -24,11 +31,11 @@ jobs:
       shell: bash
       run: mv .t2c-relay ../T2C-Phantom-relay
     
-    - uses: actions/setup-go@v5
+    - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
         go-version-file: go.mod
         
     - name: Run Google OSV-Scanner Natively
       run: |
-        go install github.com/google/osv-scanner/cmd/osv-scanner@v1
+        go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2 # version fixe (pas de @v1 flottant)
         osv-scanner --config osv-scanner.toml -r ./

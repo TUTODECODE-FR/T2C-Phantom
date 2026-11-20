@@ -1,6 +1,6 @@
 # Support T2C-Phantom
 
-Merci d'utiliser T2C-Phantom ! En tant que projet associatif et Source-Available (Auditable), nous mettons tout en œuvre pour fournir un support de qualité à notre communauté.
+Merci d'utiliser T2C-Phantom ! En tant que projet associatif et logiciel libre (AGPL-3.0-or-later), nous mettons tout en œuvre pour fournir un support de qualité à notre communauté.
 
 Voici comment obtenir de l'aide ou signaler un problème :
 

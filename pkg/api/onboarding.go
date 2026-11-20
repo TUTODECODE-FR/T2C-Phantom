@@ -86,6 +86,13 @@ func (d *Dashboard) handleSetupProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.ensureProxy()
+	d.mu.Lock()
+	on := d.proxyOn
+	d.mu.Unlock()
+	if !on {
+		writeJSON(w, map[string]any{"ok": false, "error": fmt.Sprintf("port %d occupé par un autre programme : proxy non activé", proxyPort)})
+		return
+	}
 	rep := sysint.EnableProxy(utils.GetT2CDataDir(), fmt.Sprintf("127.0.0.1:%d", proxyPort))
 	writeJSON(w, map[string]any{"ok": len(rep.Proxy) > 0 || len(rep.Errors) == 0, "report": rep})
 }

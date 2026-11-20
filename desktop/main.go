@@ -32,6 +32,7 @@ func main() {
 	utils.InitSecurityLogger(utils.GetPath("security.log"))
 
 	d := api.NewDashboard()
+	d.CleanStaleProxy() // PAC laissé par un arrêt brutal
 	err := wails.Run(&options.App{
 		Title:     "T2C Phantom",
 		Width:     1200,

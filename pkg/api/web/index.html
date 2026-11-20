@@ -38,7 +38,7 @@
         <h1>Bienvenue dans T2C Phantom</h1>
         <p class="lead">Pour afficher les sites <code>.t2c</code> en HTTPS, T2C Phantom installe un certificat créé sur ton ordinateur.</p>
         <ul class="facts">
-            <li>Il ne peut signer <strong>que</strong> les adresses <code>.t2c</code> : impossible de s'en servir pour imiter un autre site.</li>
+            <li>Il est limité aux adresses <code>.t2c</code> (ni autre nom, ni adresse IP, ni signature de programme) : un navigateur à jour refuse tout certificat qu'il signerait pour un autre site.</li>
             <li>Ta clé reste sur ton ordinateur ; personne d'autre ne la possède.</li>
             <li>Ton système peut te demander ton mot de passe pour l'ajouter.</li>
         </ul>
@@ -53,6 +53,7 @@
         <h1>Choisis ton navigateur</h1>
         <p class="lead">Les sites <code>.t2c</code> s'ouvrent dans ton navigateur habituel. <strong>Firefox est conseillé</strong> : il applique le certificat et le proxy sans aucun réglage.</p>
         <div class="browser-list" id="browserList"></div>
+        <p class="hint">Prudence : un script d'un site <code>.t2c</code> peut demander ton adresse IP par WebRTC (appels vidéo), qui ne passe pas par T2C. Dans un profil de navigateur réservé aux <code>.t2c</code>, désactive WebRTC (Firefox : <code>about:config</code> → <code>media.peerconnection.enabled</code> = <code>false</code>).</p>
         <p class="hint" id="firefoxHint" hidden>Firefox n'est pas installé. <a href="#" onclick="openURL('https://www.mozilla.org/firefox/','default');return false;">Télécharger Firefox</a>, puis reviens ici.</p>
         <div class="actions">
             <button class="btn primary" onclick="chooseBrowser()">Ouvrir ce navigateur et continuer</button>

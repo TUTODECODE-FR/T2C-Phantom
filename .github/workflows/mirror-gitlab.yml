@@ -28,9 +28,10 @@ jobs:
         run: |
           if [ -n "$GITLAB_TOKEN" ] && [ -n "$GITLAB_PROJECT" ]; then echo "on=1" >> "$GITHUB_OUTPUT";
           else echo "::notice::GITLAB_TOKEN / GITLAB_PROJECT absents : miroir ignoré"; fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         if: steps.cfg.outputs.on
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Push vers GitLab
         if: steps.cfg.outputs.on

@@ -2,7 +2,7 @@
 
 Ce dépôt contient le **client** et le **protocole**. Le relais et le serveur origine sont dans des dépôts privés séparés.
 
-Seul Cloudflare voit l'IP des utilisateurs. Le relais, l'origine et les pairs ne connaissent que des clés aléatoires. Tout contenu est signé par l'origine ou adressé par son hash.
+Seul le relais d'entrée (et son hébergeur ou tunnel) voit l'IP des membres ; l'origine, les sorties et les pairs ne connaissent que des clés aléatoires (voir « Qui voit quoi » dans SECURITY.md). Tout contenu est signé par l'origine ou adressé par son hash.
 
 ```text
 T2C-Phantom/
@@ -32,5 +32,5 @@ T2C-Phantom/
 - **Intégrité** : `Manifest.VerifyChunk`. Un morceau faux entraîne un ban local et un signalement du bénévole.
 - **Bout en bout** : les échanges entre pairs sont chiffrés en Noise IK ; le relais ne les lit pas.
 - **Proxy** : ne sert et ne certifie en HTTPS que les sites du catalogue signé ; le PAC n'y envoie que les `.t2c`.
-- **CA locale** : Name Constraints `.t2c` — même volée, sa clé ne peut imiter aucun autre site.
+- **CA locale** : Name Constraints `.t2c`, toutes les IP exclues, usage « serveur web » seulement — même volée, un navigateur à jour refuse ses certificats pour tout autre site (pas les logiciels qui ignorent ces contraintes).
 - **Identité** : `peerid` (clé aléatoire + PoW). Supprimer `identity.json` crée une nouvelle identité.

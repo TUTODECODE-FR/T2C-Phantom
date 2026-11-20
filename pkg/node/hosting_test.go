@@ -23,6 +23,7 @@ func TestRelayCandidates(t *testing.T) {
 			t.Fatal("adresse non wss acceptée")
 		}
 		for _, d := range DefaultRelays {
+			d, _, _ = strings.Cut(d, "#") // les candidats sont des URL sans clé
 			if !slices.Contains(c, d) {
 				t.Fatalf("relais par défaut absent: %s", d)
 			}
@@ -53,5 +54,20 @@ func TestHiddenRelayNeverDialed(t *testing.T) {
 	}
 	if keys := n.relayKeys(); len(keys) != 2 {
 		t.Fatalf("le relais caché doit servir aux circuits: %d clés", len(keys))
+	}
+}
+
+// Entrées de la liste racine sans clé épinglée : ignorées.
+func TestKeyedRelays(t *testing.T) {
+	k := strings.Repeat("ab", 32)
+	got := keyedRelays([]string{
+		"wss://a.example/v1/ws#k=" + k,
+		"wss://b.example/v1/ws",
+		"hidden:c#k=" + k,
+		"hidden:d",
+		"http://e.example/v1/ws#k=" + k,
+	})
+	if !slices.Equal(got, []string{"wss://a.example/v1/ws#k=" + k, "hidden:c#k=" + k}) {
+		t.Fatalf("%v", got)
 	}
 }

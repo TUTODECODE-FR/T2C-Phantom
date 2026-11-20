@@ -17,11 +17,13 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Report : ce qui a été fait, ce qui reste manuel.
@@ -155,32 +157,44 @@ func profileLabel(p string) string {
 const userJSBegin = "// >>> T2C Phantom (géré automatiquement)"
 const userJSEnd = "// <<< T2C Phantom"
 
-// geckoPrefs : fait lire aux navigateurs Gecko les CA du système (sans certutil).
+// geckoPrefs : fait lire aux navigateurs Gecko les CA du système, SEULEMENT
+// quand certutil manque (sinon la CA est ajoutée à leur base NSS, sans
+// toucher aux réglages) et jamais dans LibreWolf, dont les réglages durcis
+// sont un choix du membre. Le réglage s'applique à toutes les CA du système :
+// il n'est posé qu'à l'étape « certificat » de l'assistant, que le membre
+// lance lui-même (accord explicite), et retiré à la désactivation.
 // Pour le proxy, Firefox suit par défaut les réglages du système, donc notre PAC.
-// Le bloc est retiré à la restauration.
+//
+// Aucun réglage WebRTC n'est écrit : couper media.peerconnection.enabled dans
+// les profils habituels du membre casserait ses visioconférences. Le risque
+// (un script de site .t2c peut obtenir l'IP par STUN) est documenté.
 func geckoPrefs(enable bool) []string {
 	var done []string
 	block := userJSBegin + "\n" +
 		`user_pref("security.enterprise_roots.enabled", true);` + "\n" +
 		userJSEnd + "\n"
+	haveCertutil := certutilBin() != ""
 	for _, p := range GeckoProfiles() {
 		f := filepath.Join(p, "user.js")
 		old, _ := os.ReadFile(f)
 		s := stripBlock(string(old))
-		if enable {
+		want := enable && geckoNeedsPref(p, haveCertutil)
+		if want {
 			s += block
 		}
-		if s == string(old) {
-			if enable {
-				done = append(done, profileLabel(p))
-			}
+		if s != string(old) && os.WriteFile(f, []byte(s), 0o644) != nil {
 			continue
 		}
-		if err := os.WriteFile(f, []byte(s), 0o644); err == nil && enable {
+		if want {
 			done = append(done, profileLabel(p))
 		}
 	}
 	return done
+}
+
+// geckoNeedsPref : le profil a besoin de lire les CA du système.
+func geckoNeedsPref(profile string, haveCertutil bool) bool {
+	return !haveCertutil && !strings.Contains(strings.ToLower(profile), "librewolf")
 }
 
 func stripBlock(s string) string {
@@ -264,6 +278,11 @@ func InstallCA(certPath, nick string) Report {
 	if g := geckoPrefs(true); len(g) > 0 {
 		r.CA = append(r.CA, "Firefox/Zen lisent les CA du système ("+strings.Join(g, ", ")+")")
 	}
+	for _, p := range GeckoProfiles() {
+		if strings.Contains(strings.ToLower(p), "librewolf") && certutilBin() == "" {
+			r.manual("%s : importe toi-même le certificat (Paramètres > Certificats) ; T2C ne modifie pas LibreWolf", profileLabel(p))
+		}
+	}
 	return r
 }
 
@@ -288,6 +307,25 @@ func Restore(dataDir string) error {
 	}
 	return restoreProxy(dataDir)
 }
+
+// CleanStale : au démarrage, un PAC laissé par un arrêt brutal (réglages
+// sauvegardés encore présents) alors que le proxy local ne répond pas est
+// retiré : sinon le navigateur, ne trouvant pas le PAC, passerait les .t2c
+// en connexion directe (fuite DNS) ou vers un autre programme du port.
+// Rien n'est touché si une autre instance de l'app sert le proxy.
+func CleanStale(dataDir, proxyAddr string) bool {
+	if _, err := os.Stat(statePath(dataDir)); err != nil {
+		return false
+	}
+	if c, err := net.DialTimeout("tcp", proxyAddr, 500*time.Millisecond); err == nil {
+		c.Close()
+		return false
+	}
+	return restoreFn(dataDir) == nil
+}
+
+// restoreFn : Restore (remplacée dans les tests, qui ne touchent pas au système).
+var restoreFn = Restore
 
 // Status : où la CA est de confiance, et si le PAC est actif.
 func Status(certPath, nick, proxyAddr string) Report {

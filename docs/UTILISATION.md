@@ -28,7 +28,7 @@ Pour ne plus voir cette proposition : bouton « Ne plus demander » sur macOS, o
 
 Un assistant en 4 étapes s'affiche une seule fois :
 
-1. **Certificat** : installe le certificat local, limité aux adresses `.t2c` (impossible de s'en servir pour imiter un autre site). macOS demande ton mot de passe de session, Windows affiche un avertissement : accepte. S'il est déjà installé, l'étape est validée d'office.
+1. **Certificat** : installe le certificat local, limité aux adresses `.t2c` (un navigateur à jour refuse tout certificat qu'il signerait pour un autre site ou une adresse IP). macOS demande ton mot de passe de session, Windows affiche un avertissement : accepte. S'il est déjà installé, l'étape est validée d'office.
 2. **Navigateur** : choisis le navigateur qui ouvrira les sites. **Firefox est conseillé** : il applique le certificat et le proxy sans aucun réglage.
 3. **Proxy** : seules les adresses `.t2c` passent par T2C Phantom ; tout le reste de ta navigation est inchangé. Si ton navigateur était ouvert, ferme-le et rouvre-le.
 4. **Réseau** : création de ton identité (une clé aléatoire, sans nom ni adresse) et connexion au réseau pair à pair.

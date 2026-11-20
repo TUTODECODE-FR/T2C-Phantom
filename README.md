@@ -24,9 +24,9 @@
 T2C Phantom te permet d'ouvrir les sites **`.t2c`** de TUTODECODE (par exemple `https://tutodecode.t2c`) dans ton navigateur habituel. Ces sites ne sont pas servis par un seul serveur : ils sont **copiés et redistribués par des bénévoles**, comme toi, pendant que l'application tourne.
 
 - **Pseudonyme** — tu n'es qu'une clé générée au hasard sur ta machine. Pas de compte, pas d'email.
-- **Ton IP reste cachée** — seul le point d'entrée (Cloudflare) la voit ; les relais, le serveur et les autres pairs ne voient que ta clé.
+- **Ton IP mieux protégée** — seul le relais d'entrée (et son hébergeur ou tunnel) la voit ; le serveur, les sorties et les autres pairs ne voient qu'une clé. Voir [qui voit quoi](#qui-voit-quoi).
 - **Sites authentiques** — chaque site est signé par TUTODECODE et vérifié morceau par morceau : personne ne peut en modifier un octet en route.
-- **Mode anonyme** — dès que le réseau compte plusieurs relais, tes demandes traversent un circuit chiffré en couches : aucun relais ne relie ton IP à ce que tu consultes. Cellules de taille fixe, trafic leurre et délais aléatoires brouillent aussi l'analyse du trafic.
+- **Mode anonyme** — dès que le réseau compte plusieurs relais, tes demandes traversent un circuit chiffré en couches : aucun relais ne voit à lui seul ton IP et ce que tu consultes. Cellules de taille fixe, trafic leurre et délais aléatoires rendent l'analyse du trafic plus difficile, sans la rendre impossible.
 - **Bénévole en option** — tu choisis les sites que tu acceptes d'héberger ; tes copies sont chiffrées sur ton disque et contrôlées régulièrement.
 - **Sites officiels** — `tutodecode.t2c` (portail de tous les sites), `cours.t2c` (cours de TUTODECODE, fichier unique `cours.tdc` signé) et `repo.t2c` (code source, clonable avec `git` sans GitHub).
 
@@ -72,17 +72,16 @@ Tout le reste de ta navigation ne change pas. À la fermeture de l'application, 
 ## Trajet d'une requête
 
 ```
-Mode normal
+Mode normal (un seul relais joignable)
   Navigateur ──PAC (.t2c seulement)──▶ proxy local 127.0.0.1 + certificat local .t2c
-      ──TLS──▶ Cloudflare (voit : IP, clé, site demandé)
-      ──▶ relais (voit : clé, site demandé ; jamais l'IP)
+      ──TLS──▶ relais (voit : IP, clé, site demandé)
       ──chiffré de bout en bout (Noise)──▶ bénévole (voit : clé)
       └─ repli : serveur d'origine, joint uniquement par le relais (réseau privé)
 
 Mode anonyme (au moins deux relais)
-  Navigateur ──▶ proxy local ──TLS──▶ Cloudflare (voit : IP, clé ; pas le site)
-      ──▶ relais d'entrée (voit : clé ; pas le site, cellules chiffrées)
-      ──▶ [relais intermédiaire] ──▶ relais de sortie (voit : site ; ni IP ni clé, pseudonyme jetable)
+  Navigateur ──▶ proxy local ──TLS──▶ relais d'entrée : officiel, ou ta garde bénévole
+      en mode Partagé (voit : IP ; pas le site, cellules chiffrées)
+      ──▶ [relais du milieu] ──▶ relais de sortie (voit : site ; pas l'IP, pseudonyme jetable)
       ──chiffré de bout en bout──▶ bénévole (voit : pseudonyme jetable)
   Dans le circuit : cellules de 4 tailles fixes seulement, cellules leurres en continu,
   délai aléatoire à la sortie → ni la taille ni le rythme ne trahissent l'activité.
@@ -93,13 +92,17 @@ Mode anonyme (au moins deux relais)
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
 ## Licence
-> [!WARNING]
-> Ce dépôt public publie le **client** (application, daemon et protocole) en source-available : vous pouvez l'auditer et prouver l'absence de porte dérobée. **Ce n'est PAS open source** (pas GPLv3, pas MIT). Tous droits réservés TUTODECODE.
-> Le **code du relais et du serveur origine** n'est pas publié.
-> Utilisation, modification, distribution ou intégration commerciale par un tiers : **interdites** sans accord écrit de TUTODECODE.
+T2C Phantom (application, daemon et protocole) est un **logiciel libre** sous licence
+**GNU Affero General Public License v3 ou ultérieure** (AGPL-3.0-or-later) : voir [`LICENSE`](LICENSE) et [`NOTICE`](NOTICE).
+Tu peux l'utiliser, l'étudier, le modifier et le redistribuer ; si tu fais tourner une version modifiée
+en service pour d'autres, tu dois publier tes modifications. Les versions jusqu'à la v2.5.0 restent sous leur licence d'origine.
 
-**Pourquoi cette protection (Transparence Hybride) ?**
-Tout ce qui tourne sur ta machine est public et vérifiable : c'est là que se jouent ta vie privée et l'intégrité des sites. La sécurité du réseau ne dépend pas du secret du serveur — les sites sont signés et chaque morceau est vérifié par ton client.
+Le relais (`T2C-Phantom-relay`) est sous la même licence. Le serveur origine de l'association reste privé.
+
+**Libre, mais pas usurpable** : la sécurité ne repose sur aucun secret du code. Les sites, la liste des relais officiels,
+les consignes du réseau et les mises à jour sont signés par la clé racine de l'association, qui n'est pas distribuée.
+Une version modifiée ne peut ni se faire passer pour le réseau officiel, ni signer à sa place.
+Le nom et le logo TUTODECODE ne sont pas couverts par la licence.
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
@@ -145,21 +148,29 @@ wails build -ldflags "-X t2c/pkg/trust.RootPubKeyHex=$KEY"         # résultat d
 
 **Est-ce un VPN ou Tor ?** Non. T2C Phantom ne touche qu'aux sites `.t2c`. Pour le reste de ta navigation, rien ne change.
 
-**Qui voit quoi ?** Cloudflare voit ton IP (et, hors mode anonyme, les sites `.t2c` demandés) ; les relais voient ta clé pseudonyme, jamais ton IP ; en mode anonyme, aucun relais ne voit à la fois ta clé et ce que tu consultes. Le contenu échangé entre pairs est chiffré de bout en bout. Détails : [Guide complet](docs/GUIDE.md#8-qui-voit-quoi).
+<a id="qui-voit-quoi"></a>**Qui voit quoi ?** En résumé (tableau complet par acteur : [SECURITY.md](SECURITY.md#qui-voit-quoi-état-actuel-du-réseau)) :
 
-**Pourquoi passer par Cloudflare, un acteur centralisé ?** Choix pragmatique, assumé et limité :
-- **Ce qu'il apporte** : il cache l'adresse du relais (personne ne peut l'attaquer directement) et absorbe les attaques par saturation, ce qu'un petit relais associatif ne peut pas faire seul.
-- **Ce qu'il voit** : ton IP, comme tout point d'entrée (une connexion révèle toujours l'adresse de celui qui l'ouvre). Le nom `.t2c` ne circule jamais sur le réseau : le TLS est négocié avec le **domaine du relais** (SNI et en-tête Host du relais). Cloudflare termine toutefois ce TLS : en mode normal, il pourrait lire les demandes (empreintes des sites, rapprochables du catalogue public) ; **en mode anonyme, il ne voit que des cellules chiffrées pour les relais**, ainsi que leur taille et leur rythme, jamais le site demandé.
-- **Ce qu'il ne peut pas faire** : lire les échanges entre membres (chiffrés de bout en bout) ni modifier un site (signatures vérifiées par ton client).
-- **Si même lui ne doit pas connaître ton IP** : passe par un VPN ou Tor avant T2C Phantom. La fédération permet aussi d'ajouter des relais d'entrée qui ne dépendent pas de Cloudflare.
+| Acteur | Ton IP | Tes demandes |
+|---|---|---|
+| Relais d'entrée officiel (VPS chez Aquilenet, relais maison via Tailscale Funnel) et leur hébergeur / tunnel | oui | non en mode anonyme ; oui hors mode anonyme |
+| Garde d'entrée bénévole (mode Partagé, activée par défaut, désactivable ; jamais en Maximal) | oui | non |
+| Relais bénévole du milieu | non | non |
+| Sortie (bénévole en Partagé, association en Maximal) | non | oui, sous un pseudonyme jetable |
+| Hébergeurs, serveur d'origine | non | non (seulement les morceaux fournis, à un pseudonyme) |
+| sslip.io (DNS du nom du VPS) | l'adresse de ton résolveur DNS | non |
+| Cloudflare | prévu devant le VPS, **pas encore en place** | — |
 
-**Un observateur peut-il deviner mon activité en regardant le trafic ?** C'est beaucoup plus difficile en mode anonyme : toutes les cellules ont l'une de 4 tailles fixes (remplissage aléatoire), des cellules leurres circulent en permanence, et le relais de sortie ajoute un délai aléatoire. Ni la taille, ni le rythme, ni le moment ne permettent facilement de relier une entrée à une sortie. Comme pour Tor, un adversaire qui contrôle à la fois l'entrée et la sortie d'un circuit garde des moyens de corrélation : la diversité des opérateurs de relais reste la meilleure protection.
+Un adversaire qui observe à la fois l'entrée et la sortie d'un circuit peut relier les deux par le moment et le volume du trafic ; en Maximal, l'association tient les deux bouts. Le contenu échangé entre pairs est chiffré de bout en bout. Détails : [Guide complet](docs/GUIDE.md#8-qui-voit-quoi).
 
-T2C Phantom n'est pas un outil d'anonymat absolu comme Tor : son objectif est de **protéger ton adresse IP** et de **garantir l'authenticité des sites**, avec un mode anonyme qui coupe le lien entre ton adresse et ce que tu consultes.
+**Et Cloudflare ?** Il est prévu devant le relais principal (le VPS ne verrait plus les adresses IP), mais **n'est pas encore en place** : aujourd'hui, le VPS et son hébergeur voient l'adresse de ceux qui entrent par lui. Une fois en place, Cloudflare verra ton IP et, en mode anonyme, seulement des cellules chiffrées (taille et rythme). Si personne d'autre que toi ne doit connaître ton IP, passe par un VPN ou Tor avant T2C Phantom.
+
+**Un observateur peut-il deviner mon activité en regardant le trafic ?** C'est plus difficile en mode anonyme : toutes les cellules ont l'une de 4 tailles fixes (remplissage aléatoire), des cellules leurres circulent, et le relais de sortie ajoute un délai aléatoire. Mais un adversaire qui observe à la fois l'entrée et la sortie d'un circuit garde des moyens de corrélation : la diversité des opérateurs de relais reste la meilleure protection.
+
+T2C Phantom ne promet pas un anonymat absolu : son objectif est de **protéger ton adresse IP** et de **garantir l'authenticité des sites**, avec un mode anonyme qui sépare ton adresse (vue à l'entrée) de ce que tu consultes (vu à la sortie). Limites connues (WebRTC, liens vers le web ouvert…) : [SECURITY.md](SECURITY.md).
 
 **Un bénévole peut-il me servir un site piégé ?** Non : chaque morceau est comparé à l'empreinte signée par TUTODECODE ; un morceau modifié est rejeté, le bénévole est banni et signalé.
 
-**Le certificat installé est-il dangereux ?** Il est généré sur ta machine et **ne peut signer que des noms `.t2c`** (contrainte inscrite dans le certificat) : même volé, il ne permettrait pas d'imiter ta banque ou un autre site.
+**Le certificat installé est-il dangereux ?** Il est généré sur ta machine et limité, par des contraintes inscrites dans le certificat, aux noms `.t2c` (ni autre nom, ni adresse IP, ni signature de programme). Un navigateur à jour refuse tout certificat qu'il signerait pour un autre site, même si sa clé était volée ; un logiciel très ancien qui ignore ces contraintes ne serait pas protégé. Sa clé n'est lisible que par ton compte. Pour le retirer : voir le [Guide](docs/GUIDE.md#13-désinstaller).
 
 **C'est lent ?** Un peu, au premier passage, et c'est le prix de l'anonymat : chaque demande traverse deux relais, avec des cellules de taille fixe et de petits délais aléatoires. Depuis la v2.5, l'application ne télécharge que la page ouverte (pas le site entier), garde ce qu'elle a reçu en cache, et envoie les gros fichiers au fil de l'eau. Plus il y a de bénévoles et de relais, plus c'est rapide.
 
@@ -230,5 +241,5 @@ Notre mission est de démocratiser la maîtrise des infrastructures informatique
 
 ---
 <div align="center">
-  <i>© 2026 TUTODECODE - Tous droits réservés.</i>
+  <i>© 2026 Association TUTODECODE — logiciel libre sous licence AGPL-3.0-or-later.</i>
 </div>

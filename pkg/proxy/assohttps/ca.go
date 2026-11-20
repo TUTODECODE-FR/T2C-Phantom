@@ -87,11 +87,18 @@ func create(dir, certPath, keyPath string) (*CA, error) {
 		IsCA:                  true,
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
-		// Name Constraints : cette CA ne peut signer QUE des noms en .t2c.
-		// Installée dans le système, même sa clé volée ne pourrait pas imiter
-		// un autre site (banque, mail…). Respecté par Chrome, Firefox, Safari, Edge.
+		// Usage limité aux serveurs web (pas de signature de code, ni de mail).
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		// Name Constraints : noms DNS en .t2c seulement, aucune adresse IP,
+		// aucun e-mail ni URI utilisable. Un navigateur à jour refuse donc tout
+		// certificat de cette CA pour un autre site, même signé avec sa clé
+		// volée. Les vieux logiciels qui ignorent ces contraintes ne sont pas
+		// protégés : la clé reste lisible par le seul compte du membre (0600).
 		PermittedDNSDomainsCritical: true,
 		PermittedDNSDomains:         []string{"t2c"},
+		ExcludedIPRanges:            noIPs(),
+		PermittedEmailAddresses:     []string{"t2c.invalid"},
+		PermittedURIDomains:         []string{"t2c.invalid"},
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {
@@ -132,6 +139,13 @@ func load(dir, certPath, keyPath string) (*CA, error) {
 	if err != nil {
 		return nil, err
 	}
+	// clé privée lisible par le seul compte du membre
+	if st, err := os.Stat(keyPath); err == nil && st.Mode().Perm()&0o077 != 0 {
+		if err := os.Chmod(keyPath, 0o600); err != nil {
+			return nil, fmt.Errorf("asso-ca: clé trop ouverte (%o) : %w", st.Mode().Perm(), err)
+		}
+	}
+	_ = os.Chmod(dir, 0o700)
 	key, err := x509.ParseECPrivateKey(kb.Bytes)
 	if err != nil {
 		return nil, err
@@ -251,7 +265,29 @@ func IsLoopback(addr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// constrainedToT2C : la CA est limitée aux noms .t2c.
+// noIPs : toutes les adresses IPv4 et IPv6 exclues.
+func noIPs() []*net.IPNet {
+	return []*net.IPNet{
+		{IP: net.IPv4zero.To4(), Mask: net.CIDRMask(0, 32)},
+		{IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)},
+	}
+}
+
+// constrainedToT2C : la CA est limitée aux noms .t2c, sans aucune IP, et aux
+// serveurs web. Une CA plus ancienne (sans ces contraintes) est régénérée.
 func constrainedToT2C(cert *x509.Certificate) bool {
-	return cert.PermittedDNSDomainsCritical && len(cert.PermittedDNSDomains) == 1 && cert.PermittedDNSDomains[0] == "t2c"
+	if !cert.PermittedDNSDomainsCritical || len(cert.PermittedDNSDomains) != 1 || cert.PermittedDNSDomains[0] != "t2c" {
+		return false
+	}
+	if len(cert.ExtKeyUsage) != 1 || cert.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth || len(cert.PermittedIPRanges) != 0 {
+		return false
+	}
+	v4, v6 := false, false
+	for _, n := range cert.ExcludedIPRanges {
+		if ones, bits := n.Mask.Size(); ones == 0 {
+			v4 = v4 || bits == 32
+			v6 = v6 || bits == 128
+		}
+	}
+	return v4 && v6
 }

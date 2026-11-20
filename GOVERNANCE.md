@@ -1,7 +1,7 @@
 # Gouvernance du Projet T2C-Phantom
 
 ## 1. Vision et Objectifs
-Le projet **T2C-Phantom** est porté par l'association à but non lucratif **TUTODECODE**. Notre mission est de démocratiser l'apprentissage de la cybersécurité et du développement logiciel à travers des outils "Source-Available" (Auditable), gratuits, souverains, et respectueux de la vie privée (Offline-First, Zero Cloud).
+Le projet **T2C-Phantom** est porté par l'association à but non lucratif **TUTODECODE**. Notre mission est de démocratiser l'apprentissage de la cybersécurité et du développement logiciel à travers des logiciels libres (AGPL-3.0-or-later), gratuits, souverains, et respectueux de la vie privée (Offline-First, Zero Cloud).
 
 ## 2. Structure de Gouvernance
 Ce projet suit un modèle de gouvernance du type "Maintainer-led" (dirigé par les mainteneurs), supervisé par le conseil d'administration de l'association TUTODECODE.
@@ -17,7 +17,7 @@ Ce projet suit un modèle de gouvernance du type "Maintainer-led" (dirigé par l
 - En cas de désaccord, les Mainteneurs Principaux (représentant l'association) prennent la décision finale.
 
 ## 4. Propriété Intellectuelle
-L'ensemble du code soumis au dépôt T2C-Phantom doit respecter les termes de notre licence (voir `LICENSE`). En soumettant une Pull Request, vous acceptez que votre contribution soit distribuée sous cette même licence et certifiez que vous avez le droit de partager ce code.
+Le code de T2C-Phantom est distribué sous licence GNU AGPL v3 ou ultérieure (voir `LICENSE` et `NOTICE`). En soumettant une Pull Request, vous acceptez que votre contribution soit distribuée sous cette même licence et certifiez, par la signature DCO de vos commits, que vous avez le droit de partager ce code. Le nom, le logo TUTODECODE et la clé racine de l'association ne sont pas couverts par la licence.
 
 ## 5. Financement et Indépendance
 En tant que projet associatif, T2C-Phantom refuse toute monétisation basée sur l'exploitation des données utilisateurs (pas de trackers, pas de publicité). Le projet est financé par les dons, les subventions et les cotisations des membres de l'association.

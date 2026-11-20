@@ -81,7 +81,7 @@ Lance ces commandes dans le dossier où se trouvent le fichier et `SHA256SUMS.tx
 
 Un **assistant en 4 étapes** s'affiche une seule fois.
 
-1. **Certificat.** T2C Phantom crée sur ton ordinateur un certificat qui ne peut signer **que** les adresses `.t2c`. Il est impossible de s'en servir pour imiter un autre site (contrainte de nom reconnue par tous les navigateurs modernes). Ton système peut demander ton mot de passe pour l'ajouter. S'il est déjà installé, l'étape est validée d'office.
+1. **Certificat.** T2C Phantom crée sur ton ordinateur un certificat qui ne peut signer **que** les adresses `.t2c`. Il est limité aux noms `.t2c` (ni autre nom, ni adresse IP, ni signature de programme) : un navigateur à jour refuse tout certificat qu'il signerait pour un autre site, même avec sa clé volée ; un logiciel très ancien qui ignore ces contraintes ne serait pas protégé. Ton système peut demander ton mot de passe pour l'ajouter. S'il est déjà installé, l'étape est validée d'office.
 2. **Navigateur.** Choisis le navigateur qui ouvrira les sites. **Firefox est conseillé** : il prend en compte le certificat et le proxy sans aucun réglage. Chrome, Edge, Safari, Brave, Zen et LibreWolf fonctionnent aussi.
 3. **Proxy.** Un fichier de configuration automatique (PAC) envoie **uniquement** les adresses `.t2c` vers T2C Phantom ; tout le reste de ta navigation part directement, comme avant. Si ton navigateur était ouvert, ferme-le puis rouvre-le.
 4. **Réseau.** T2C Phantom crée ton identité (une clé aléatoire, quelques secondes de calcul la première fois), puis rejoint le réseau.
@@ -368,13 +368,15 @@ La variable `T2C_DATA_DIR` permet de changer ce dossier. L'outil `t2c-peer` gard
 3. Facultatif : retire le certificat **« tutodecode CA »** :
    - macOS : Trousseau d'accès → session → Certificats ;
    - Windows : `certmgr.msc` → Autorités de certification racines de confiance ;
-   - Firefox : Réglages → Certificats → Autorités.
+   - Firefox : Réglages → Certificats → Autorités ;
+   - Linux (bases NSS, si `certutil` est installé) : `certutil -D -n "tutodecode CA" -d sql:$HOME/.pki/nssdb`, et de même pour chaque profil Firefox.
 
 ---
 
 ## 14. Limites connues
 
-- **Le point d'entrée voit ton IP.** Toute connexion révèle l'adresse de celui qui l'ouvre ; c'est Cloudflare (ou le relais principal tant que le domaine n'est pas actif). Si même lui ne doit pas la connaître, utilise un VPN ou Tor avant T2C Phantom.
+- **Le point d'entrée voit ton IP.** Toute connexion révèle l'adresse de celui qui l'ouvre : relais d'entrée de l'association (et son hébergeur Aquilenet ou le tunnel Tailscale Funnel), ou ta garde bénévole en mode Partagé. Cloudflare est prévu devant le VPS mais pas encore en place. Si personne d'autre que toi ne doit la connaître, utilise un VPN ou Tor avant T2C Phantom.
+- **WebRTC.** Un script d'un site `.t2c` peut demander ton adresse IP par WebRTC, qui ne passe pas par T2C. T2C ne touche pas aux réglages de tes profils de navigateur habituels ; utilise un profil réservé aux `.t2c` avec WebRTC désactivé (Firefox : `media.peerconnection.enabled` = `false`).
 - **L'anonymat suppose des relais indépendants.** Il repose sur le fait que les relais d'un circuit ne s'entendent pas entre eux, comme pour Tor. Des relais tenus par un même opérateur ne protègent pas contre cet opérateur. Les tailles fixes, le trafic leurre et les délais rendent la corrélation bien plus difficile, sans la rendre impossible pour un adversaire qui observe à la fois l'entrée et la sortie.
 - **Le bénévolat n'est pas anonyme vis-à-vis de son relais**, qui sait quels sites tu héberges.
 - **La bande passante des relais** est la limite du réseau : tout le trafic entre membres passe par eux.

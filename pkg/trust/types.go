@@ -205,6 +205,21 @@ func (h *HostsList) Verify(root ed25519.PublicKey) error {
 	return verify(k, domHosts, u, h.Sig)
 }
 
+// Signer : clé de service qui a signé (hex), ou « root ».
+func (h *HostsList) Signer() string { return delegSigner(h.Deleg) }
+
+// VerifyNotRevoked : Verify, puis refus si la clé de service qui a signé est
+// révoquée par la liste racine rl (serveur piraté). rl peut être nil.
+func (h *HostsList) VerifyNotRevoked(root ed25519.PublicKey, rl *RelayList) error {
+	if err := h.Verify(root); err != nil {
+		return err
+	}
+	if rl.revoked(h.Signer()) {
+		return ErrRevoked
+	}
+	return nil
+}
+
 // IsBanned : pair présent dans la liste des bannis.
 func (h *HostsList) IsBanned(peerID string) bool {
 	for _, b := range h.Banned {
@@ -247,6 +262,31 @@ func (t *Ticket) Verify(root ed25519.PublicKey) error {
 	u := *t
 	u.Sig = ""
 	return verify(k, domTicket, u, t.Sig)
+}
+
+// Signer : clé de service qui a signé (hex), ou « root ».
+func (t *Ticket) Signer() string { return delegSigner(t.Deleg) }
+
+// VerifyNotRevoked : Verify, puis refus si la clé de service qui a signé est
+// révoquée par la liste racine rl. rl peut être nil.
+func (t *Ticket) VerifyNotRevoked(root ed25519.PublicKey, rl *RelayList) error {
+	if err := t.Verify(root); err != nil {
+		return err
+	}
+	if rl.revoked(t.Signer()) {
+		return ErrRevoked
+	}
+	return nil
+}
+
+// ErrRevoked : document signé par une clé de service révoquée par la racine.
+var ErrRevoked = errors.New("trust: clé de service révoquée")
+
+func delegSigner(d *Delegation) string {
+	if d == nil {
+		return "root"
+	}
+	return d.Key
 }
 
 func isHexHash(s string) bool {

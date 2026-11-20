@@ -16,8 +16,9 @@ import (
 )
 
 // RootPubKeyHex : clé publique de l'origine intégrée au client.
-// Fixée au build : -ldflags "-X t2c/pkg/trust.RootPubKeyHex=<hex>"
-// ou à l'exécution via T2C_ROOT_PUBKEY (tests / réseau de dev).
+// Fixée au build : -ldflags "-X t2c/pkg/trust.RootPubKeyHex=<hex>".
+// T2C_ROOT_PUBKEY n'est lue que si aucune clé n'est intégrée (version de
+// développement, tests) : elle ne remplace JAMAIS la clé d'une release.
 var RootPubKeyHex = ""
 
 var (
@@ -29,10 +30,7 @@ var (
 // RootKey renvoie la clé publique de confiance.
 func RootKey() (ed25519.PublicKey, error) {
 	rootOnce.Do(func() {
-		h := strings.TrimSpace(os.Getenv("T2C_ROOT_PUBKEY"))
-		if h == "" {
-			h = RootPubKeyHex
-		}
+		h := rootHex(RootPubKeyHex, os.Getenv("T2C_ROOT_PUBKEY"))
 		if h == "" {
 			rootErr = errors.New("trust: aucune clé racine (RootPubKeyHex / T2C_ROOT_PUBKEY)")
 			return
@@ -40,6 +38,15 @@ func RootKey() (ed25519.PublicKey, error) {
 		rootKey, rootErr = ParsePublicKey(h)
 	})
 	return rootKey, rootErr
+}
+
+// rootHex : la clé intégrée l'emporte toujours ; la variable d'environnement
+// ne sert qu'aux versions sans clé intégrée.
+func rootHex(compiled, env string) string {
+	if c := strings.TrimSpace(compiled); c != "" {
+		return c
+	}
+	return strings.TrimSpace(env)
 }
 
 func ParsePublicKey(h string) (ed25519.PublicKey, error) {
