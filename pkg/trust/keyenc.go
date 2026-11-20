@@ -146,3 +146,24 @@ func EncryptKeyFile(path string, pass []byte) (ed25519.PublicKey, error) {
 	}
 	return ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey), nil
 }
+
+// KeyFilePublic : clé publique d'un fichier de clé (chiffré ou non) SANS
+// demander la phrase de passe (champ « pub » d'une clé chiffrée).
+func KeyFilePublic(path string) (ed25519.PublicKey, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if IsEncryptedKey(data) {
+		var f encKeyFile
+		if err := json.Unmarshal(data, &f); err != nil {
+			return nil, fmt.Errorf("trust: %s illisible", path)
+		}
+		return ParsePublicKey(f.Pub)
+	}
+	seed, err := hex.DecodeString(strings.TrimSpace(string(data)))
+	if err != nil || len(seed) != ed25519.SeedSize {
+		return nil, fmt.Errorf("trust: graine invalide dans %s", path)
+	}
+	return ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey), nil
+}

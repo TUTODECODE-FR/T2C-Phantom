@@ -45,6 +45,14 @@ func TestNetworkPolicy(t *testing.T) {
 	if q.Verify(rootPub, now) == nil {
 		t.Fatal("délégation sans portée policy acceptée")
 	}
+	// ancienne délégation du serveur (hosts, tickets ET policy) : refusée,
+	// seule une délégation dédiée aux consignes peut les signer
+	dm, _ := NewDelegation(rootPriv, svcPub, time.Hour, ScopeHosts, ScopeTicket, ScopePolicy)
+	q = mk()
+	_ = q.SignDelegated(svcPriv, dm)
+	if err := q.Verify(rootPub, now); err != ErrPolicyScope {
+		t.Fatalf("délégation mixte acceptée pour les consignes: %v", err)
+	}
 	// altération après signature
 	q = mk()
 	_ = q.SignDelegated(svcPriv, d)

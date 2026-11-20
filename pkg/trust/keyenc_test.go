@@ -46,3 +46,20 @@ func TestEncryptedKey(t *testing.T) {
 		t.Fatal("double chiffrement accepté")
 	}
 }
+
+func TestKeyFilePublic(t *testing.T) {
+	p := t.TempDir() + "/k"
+	pub, err := GenerateKey(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := KeyFilePublic(p); err != nil || !got.Equal(pub) {
+		t.Fatalf("clé en clair: %v", err)
+	}
+	if _, err := EncryptKeyFile(p, []byte("une phrase de passe assez longue")); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := KeyFilePublic(p); err != nil || !got.Equal(pub) {
+		t.Fatalf("clé chiffrée: %v", err)
+	}
+}

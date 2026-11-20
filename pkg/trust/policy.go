@@ -9,9 +9,12 @@ import (
 	"time"
 )
 
-// NetworkPolicy : consignes réseau, émises en direct par le serveur maison
-// (clé de service déléguée, portée « policy ») ou par la racine. Appliquées
-// par les relais officiels, les relais bénévoles et les applications.
+// NetworkPolicy : consignes réseau, signées sur le poste de l'éditeur par la
+// « clé de consignes » (délégation DÉDIÉE, portée « policy » seule) ou par la
+// racine. Le serveur maison ne fait que les PROPOSER (pilote automatique) et
+// servir la dernière version signée : un intrus sur le serveur ne peut ni
+// exclure, ni déclencher l'urgence, ni changer les parts. Appliquées par les
+// relais officiels, les relais bénévoles et les applications.
 //
 // Règle de sécurité : une consigne ne peut que RESSERRER (plafonds plus bas,
 // preuve de travail plus dure, relais exclus, moins de bénévoles). Elle ne
@@ -100,6 +103,11 @@ func (p *NetworkPolicy) Verify(root ed25519.PublicKey, now time.Time) error {
 			return bad
 		}
 	}
+	// délégation dédiée : une délégation de service (hosts, tickets…) qui
+	// porterait aussi « policy » (anciennes délégations du serveur) est refusée.
+	if p.Deleg != nil && (len(p.Deleg.Scopes) != 1 || p.Deleg.Scopes[0] != ScopePolicy) {
+		return ErrPolicyScope
+	}
 	k, err := signerKey(root, p.Deleg, ScopePolicy)
 	if err != nil {
 		return err
@@ -114,6 +122,10 @@ func (p *NetworkPolicy) Verify(root ed25519.PublicKey, now time.Time) error {
 	}
 	return nil
 }
+
+// ErrPolicyScope : consignes signées par une délégation qui n'est pas dédiée
+// aux consignes (par exemple la clé de service du serveur).
+var ErrPolicyScope = errors.New("trust: consignes signées hors d'une délégation dédiée « policy »")
 
 // ErrPolicyExpired : consignes authentiques mais expirées. Seuls leurs relais
 // exclus et leur mode urgence restent appliqués (voir live).
