@@ -119,6 +119,18 @@ jobs:
             ${TAGS:+-tags $TAGS} \
             -ldflags "-s -w -X main.version=${TAG} -X t2c/pkg/trust.RootPubKeyHex=${ROOT}"
 
+      - name: Signature Developer ID + notarisation Apple
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_CERT_IDENTITY: ${{ secrets.MACOS_CERT_IDENTITY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          SIGN_REQUIRED: ${{ vars.MACOS_SIGN_REQUIRED || '0' }}
+        run: bash .github/scripts/macos-sign.sh app "desktop/build/bin/T2C Phantom.app"
+
       - name: Paquet macOS
         if: runner.os == 'macOS'
         working-directory: desktop/build/bin
@@ -184,6 +196,42 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  cli-macos:
+    needs: cli
+    name: CLI macOS (signature + notarisation)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          ref: ${{ env.SRC_REF }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: cli
+          path: dist
+      - name: Signer et notariser t2c et t2c-peer (macOS)
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_CERT_IDENTITY: ${{ secrets.MACOS_CERT_IDENTITY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          SIGN_REQUIRED: ${{ vars.MACOS_SIGN_REQUIRED || '0' }}
+        run: |
+          for tgz in dist/t2c-cli-*-darwin-*.tar.gz; do
+            d=$(basename "$tgz" .tar.gz)
+            tar xzf "$tgz"
+            bash .github/scripts/macos-sign.sh binary "$d/t2c" "$d/t2c-peer"
+            rm -f "$tgz" && tar czf "$tgz" "$d" && rm -rf "$d"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli
+          path: dist/*
+          overwrite: true
+          if-no-files-found: error
+
   notes:
     needs: check
     name: Notes de version
@@ -206,7 +254,7 @@ jobs:
           path: notes/notes.md
 
   release:
-    needs: [desktop, cli, notes]
+    needs: [desktop, cli-macos, notes]
     if: github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:

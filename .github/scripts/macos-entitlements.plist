@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Droits de T2C Phantom en exécution durcie (« hardened runtime »), exigée par la
+  notarisation Apple. Aucun bac à sable (l'application règle le proxy et le
+  certificat .t2c du système), aucune exception : ni code non signé, ni JIT dans
+  le processus de l'application (WebKit exécute ses pages dans ses propres
+  processus), ni bibliothèques tierces.
+-->
+<plist version="1.0">
+<dict>
+</dict>
+</plist>
