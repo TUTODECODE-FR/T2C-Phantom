@@ -81,6 +81,11 @@ jobs:
             name: Linux-amd64
             tags: webkit2_41
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      actions: read # SignPath télécharge l'exécutable non signé de cette exécution
+    env:
+      SIGNPATH_ON: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -111,6 +116,21 @@ jobs:
       - name: Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
+      - name: Version du tag dans les métadonnées de l'app
+        shell: bash
+        run: |
+          # Windows (propriétés du fichier) et macOS (Info.plist) affichent la version du tag ;
+          # SignPath exige une version réelle et identique d'une compilation à l'autre.
+          v="${TAG#v}"; [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || v=0.0.0
+          python3 - "$v" <<'PY'
+          import json, sys
+          p = "desktop/wails.json"
+          c = json.load(open(p, encoding="utf-8"))
+          c["info"]["productVersion"] = sys.argv[1]
+          json.dump(c, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          PY
+          echo "version $v"
+
       - name: Build
         working-directory: desktop
         shell: bash
@@ -138,6 +158,44 @@ jobs:
         if: runner.os == 'macOS'
         working-directory: desktop/build/bin
         run: ditto -c -k --keepParent "T2C Phantom.app" "$GITHUB_WORKSPACE/T2C-Phantom-${{ matrix.name }}.zip"
+
+      - name: Exécutable Windows non signé (pour SignPath)
+        id: unsigned
+        if: runner.os == 'Windows' && env.SIGNPATH_ON == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-non-signe
+          path: desktop/build/bin/T2C-Phantom.exe
+          if-no-files-found: error
+
+      - name: Signature Windows (SignPath Foundation)
+        if: runner.os == 'Windows' && env.SIGNPATH_ON == 'true'
+        uses: SignPath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          connector-url: https://app.signpath.io/Api/v1/GitHubCom/
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'T2C-Phantom' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_SLUG || 'initial' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion-timeout-in-seconds: 3600 # chaque version est approuvée à la main
+          output-artifact-directory: signe
+
+      - name: Remplacer par l'exécutable signé
+        if: runner.os == 'Windows' && env.SIGNPATH_ON == 'true'
+        shell: pwsh
+        run: |
+          Copy-Item signe/T2C-Phantom.exe desktop/build/bin/T2C-Phantom.exe -Force
+          $sig = Get-AuthenticodeSignature desktop/build/bin/T2C-Phantom.exe
+          if ($sig.Status -ne 'Valid') { Write-Error "signature Windows invalide : $($sig.Status)"; exit 1 }
+          "signé par : $($sig.SignerCertificate.Subject)"
+
+      - name: Windows non signé
+        if: runner.os == 'Windows' && env.SIGNPATH_ON != 'true'
+        shell: bash
+        run: |
+          echo "::warning::SIGNPATH_API_TOKEN absent : exécutable Windows NON signé (alerte SmartScreen)"
 
       - name: Paquet Windows
         if: runner.os == 'Windows'

@@ -79,5 +79,5 @@ Installation et premiers pas : $URL/blob/$TAG/docs/UTILISATION.md
 sha256sum -c SHA256SUMS.txt --ignore-missing
 \`\`\`
 
-Applications non signées par Apple et Microsoft : au premier lancement, macOS (clic droit, Ouvrir) et Windows (SmartScreen, Exécuter quand même) affichent un avertissement.
+Signature : macOS signé Developer ID et notarisé par Apple ; Windows signé par SignPath Foundation dès que la signature est active (sinon SmartScreen affiche un avertissement : Exécuter quand même). [Code signing policy]($URL/blob/$TAG/docs/CODE-SIGNING-POLICY.md) — Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 EOF

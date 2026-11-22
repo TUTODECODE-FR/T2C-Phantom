@@ -119,6 +119,6 @@ La réponse attendue est `accepted` et `source=Notarized Developer ID`.
 
 Premier essai sans rien publier : GitHub → **Actions** → **Release** → **Run workflow** avec `dry_run` coché. Les fichiers signés sont téléchargeables dans les « artifacts » de l'exécution.
 
-## Windows (pour mémoire)
+## Windows
 
-L'avertissement SmartScreen de Windows ne dépend pas d'Apple : il faut un certificat de signature Windows. **SignPath Foundation** en fournit gratuitement aux projets libres (T2C Phantom est en AGPL).
+Voir [Signature Windows avec SignPath Foundation](SIGNATURE-WINDOWS.md).
