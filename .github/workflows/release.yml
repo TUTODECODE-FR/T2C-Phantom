@@ -44,7 +44,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! [[ "$TAG" =~ ^v[0-9A-Za-z.+-]+$ ]]; then echo "::error::tag invalide : $TAG"; exit 1; fi
+          # « essai-… » : seulement en essai à blanc (ne déclenche jamais de vraie release)
+          if ! [[ "$TAG" =~ ^v[0-9A-Za-z.+-]+$ ]] && ! { [ "$DRY_RUN" = true ] && [[ "$TAG" =~ ^essai-[0-9A-Za-z.-]+$ ]]; }; then
+            echo "::error::tag invalide : $TAG"; exit 1
+          fi
           gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" > /dev/null || { echo "::error::le tag $TAG n'existe pas"; exit 1; }
       - name: Clé racine présente
         env:
