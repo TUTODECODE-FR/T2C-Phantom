@@ -122,3 +122,15 @@ Premier essai sans rien publier : GitHub → **Actions** → **Release** → **R
 ## Windows
 
 Voir [Signature Windows avec SignPath Foundation](SIGNATURE-WINDOWS.md).
+
+## Snap Store (T2DECODE, snapcraft.io/t2decode)
+
+La CI `snap.yml` de T2DECODE compile le snap (amd64 et arm64) à chaque tag, avec la version du tag, et le publie sur le canal **stable**. Les ordinateurs qui ont installé le snap se mettent ensuite à jour tout seuls.
+
+Il suffit d'un secret dans le dépôt GitHub de T2DECODE, `SNAPCRAFT_STORE_CREDENTIALS`, limité à ce snap et valable un an :
+
+```bash
+snapcraft export-login --snaps t2decode --acls package_access,package_push,package_release --expires 2027-11-22T00:00:00 -
+```
+
+La commande te demande de te connecter à ton compte Snapcraft, puis affiche un long texte : colle-le **entier** comme valeur du secret. Un fichier `snapcraft_credentials.txt` qui traîne dans ton dossier personnel peut contenir d'anciens identifiants : s'ils ne servent plus, supprime-le.
