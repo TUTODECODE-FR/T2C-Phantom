@@ -2,6 +2,8 @@
 
 SignPath Foundation signe **gratuitement** les applications des projets libres. Une fois en place, l'alerte SmartScreen de Windows (« Windows a protégé votre ordinateur ») disparaît au fil des téléchargements, car la réputation se construit sur le certificat.
 
+> **État au 2026-11-22 : demande refusée** par SignPath Foundation (visibilité publique insuffisante : étoiles, contributeurs, articles). Recandidater après l'ouverture publique et l'activation de `t2cphantom.eu.org`. La CI ci-dessous reste en place et ne fait rien tant que le jeton n'existe pas.
+
 La CI est déjà prête : dès que le secret `SIGNPATH_API_TOKEN` existe, chaque release envoie l'exécutable Windows à SignPath, attend ton approbation, puis publie le fichier signé, sur GitHub d'abord, puis recopié à l'identique sur GitLab.
 
 ## 1. Avant de candidater (déjà fait dans le dépôt)

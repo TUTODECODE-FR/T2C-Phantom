@@ -2,13 +2,13 @@
 
 **Politique de signature du code de T2C Phantom**
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+**Windows : pas encore signé.** La demande à SignPath Foundation a été refusée le 2026-11-22 (projet pas encore assez connu publiquement) ; une nouvelle demande sera faite après l'ouverture publique du projet. D'ici là, Windows affiche l'alerte SmartScreen : « Informations complémentaires » → « Exécuter quand même », après avoir vérifié la somme SHA-256.
 
 ## Ce qui est signé
 
 | Système | Signature | Par qui |
 |---|---|---|
-| **Windows** | Authenticode | certificat de **SignPath Foundation**, via [SignPath.io](https://signpath.io) |
+| **Windows** | **pas encore signé** (sommes SHA-256 publiées) | prévu : Authenticode, via SignPath Foundation ou un autre fournisseur |
 | **macOS** | Developer ID + notarisation Apple | certificat **Developer ID Application: TUTODECODE (TS97M57BJV)** |
 | **Linux** | sommes SHA-256 publiées avec chaque version (`SHA256SUMS.txt`) | — |
 
@@ -22,14 +22,14 @@ Seuls les programmes **construits par l'intégration continue GitHub Actions à 
 | **Relecteurs** (revoient toute contribution externe avant fusion) | [@itswinancher](https://github.com/itswinancher) |
 | **Approbateurs** (approuvent chaque demande de signature, une par une) | [@itswinancher](https://github.com/itswinancher) |
 
-Tous les membres utilisent l'**authentification à plusieurs facteurs** sur GitHub, GitLab et SignPath.
+Tous les membres utilisent l'**authentification à plusieurs facteurs** sur GitHub, GitLab et Apple.
 
 ## Processus
 
 1. Une version est taguée (`vX.Y.Z`) dans ce dépôt.
 2. GitHub Actions compile l'application à partir de ce tag ; le nom du produit et la version du tag sont inscrits dans les métadonnées du fichier.
-3. L'exécutable Windows non signé est transmis à SignPath, qui vérifie qu'il provient bien de cette compilation.
-4. Un approbateur **valide manuellement** la demande de signature.
+3. L'application macOS est signée avec le certificat Developer ID puis notarisée par Apple. (Windows, dès qu'une signature sera en place : un approbateur validera manuellement chaque demande.)
+4. Les sommes SHA-256 de tous les fichiers sont publiées avec la version.
 5. Le fichier signé est publié sur GitHub, puis recopié à l'identique sur GitLab (sommes de contrôle vérifiées).
 
 ## Ce que fait le programme sur l'ordinateur
