@@ -78,27 +78,24 @@ Les mêmes six secrets que ci-dessus, plus :
 
 Variables (facultatives) : `APPSTORE_SUBMIT` = `1` pour **soumettre automatiquement à l'examen d'Apple**, et `APPSTORE_AUTO_RELEASE` = `1` pour **publier dès l'approbation**.
 
-## 5. T2DECODE : GitLab → GitHub automatique
+## 5. T2DECODE : GitHub d'abord, GitLab reçoit
 
-Le développement de T2DECODE se fait sur GitLab, mais les machines macOS gratuites sont chez GitHub. GitLab peut recopier le dépôt sur GitHub à chaque envoi :
+GitHub est le dépôt principal : la CI y compile et y signe tout. GitLab reçoit ensuite le code (`mirror-gitlab.yml`, à chaque envoi sur `main` et à chaque tag) et les fichiers signés de chaque version (job `gitlab` de `release.yml`).
 
-1. GitHub → **Settings → Developer settings → Fine-grained tokens** → jeton limité au dépôt `TUTODECODE-FR/T2DECODE`, droit **Contents : Read and write**, expiration 1 an.
-2. GitLab → projet T2DECODE → **Settings → Repository → Mirroring repositories** :
-   - URL : `https://github.com/TUTODECODE-FR/T2DECODE.git`
-   - Direction : **Push**, utilisateur : ton identifiant GitHub, mot de passe : le jeton ;
-   - coche **Mirror only protected branches** ;
-   - **Mirror repository**.
+1. GitLab → projet `tutodecode-org/T2DECODE` → **Settings → Access tokens** → jeton de projet, rôle **Maintainer**, droits **api** et **write_repository**, expiration 1 an.
+2. GitHub → `TUTODECODE-FR/T2DECODE` → **Settings → Secrets and variables → Actions** → secret `GITLAB_TOKEN` = ce jeton.
+3. Variable facultative `GITLAB_PROJECT` si le projet GitLab change de chemin (défaut `tutodecode-org/T2DECODE`).
 
-Chaque commit et chaque tag poussé sur GitLab arrive alors sur GitHub en quelques minutes, ce qui déclenche la CI d'Apple.
+Sans ce secret, GitHub fonctionne normalement et GitLab n'est simplement pas mis à jour.
 
 ## 6. Publier une version
 
 ```bash
 git tag -a v1.0.5 -m "T2DECODE 1.0.5"
-git push origin v1.0.5
+git push github v1.0.5
 ```
 
-Pour T2DECODE : le tag part sur GitLab, le miroir le recopie sur GitHub, et la CI :
+Pour T2DECODE : le tag part sur GitHub, la CI le recopie sur GitLab, et :
 1. compile l'app Mac avec la version `1.0.5` et un numéro de build croissant ;
 2. la signe pour l'App Store et l'envoie dans **App Store Connect**, où elle apparaît dans **TestFlight** au bout de 10 à 30 minutes ;
 3. si `APPSTORE_SUBMIT` = `1`, la soumet à l'examen d'Apple.
@@ -130,7 +127,7 @@ La CI `snap.yml` de T2DECODE compile le snap (amd64 et arm64) à chaque tag, ave
 Il suffit d'un secret dans le dépôt GitHub de T2DECODE, `SNAPCRAFT_STORE_CREDENTIALS`, limité à ce snap et valable un an :
 
 ```bash
-snapcraft export-login --snaps t2decode --acls package_access,package_push,package_release --expires 2027-11-22T00:00:00 -
+snapcraft export-login --snaps t2decode --acls package_access,package_push,package_release --expires 2027-11-22 -
 ```
 
 La commande te demande de te connecter à ton compte Snapcraft, puis affiche un long texte : colle-le **entier** comme valeur du secret. Un fichier `snapcraft_credentials.txt` qui traîne dans ton dossier personnel peut contenir d'anciens identifiants : s'ils ne servent plus, supprime-le.
