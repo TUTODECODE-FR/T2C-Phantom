@@ -8,6 +8,7 @@
 #   variable T2C_ROOT_PUBKEY : clé publique racine (sortie de `t2c-serv init`) — obligatoire
 #   secret   GITLAB_TOKEN    : jeton GitLab (scopes api + write_repository) — optionnel
 #   variable GITLAB_PROJECT  : ex. tutodecode-org/T2C-Phantom — optionnel
+#   variables AZURE_*        : signature Windows (docs/SIGNATURE-WINDOWS.md) — optionnel
 name: Release
 
 on:
@@ -192,10 +193,10 @@ jobs:
           "signé par : $($sig.SignerCertificate.Subject)"
 
       - name: Windows non signé
-        if: runner.os == 'Windows' && env.SIGNPATH_ON != 'true'
+        if: runner.os == 'Windows' && env.SIGNPATH_ON != 'true' && vars.AZURE_SIGNING_ACCOUNT == ''
         shell: bash
         run: |
-          echo "::warning::SIGNPATH_API_TOKEN absent : exécutable Windows NON signé (alerte SmartScreen)"
+          echo "::warning::ni SignPath ni Azure configuré : exécutable Windows NON signé (alerte SmartScreen)"
 
       - name: Paquet Windows
         if: runner.os == 'Windows'
@@ -293,6 +294,109 @@ jobs:
           overwrite: true
           if-no-files-found: error
 
+  # Signature Windows par Azure Artifact Signing (crédit Azure de Microsoft for
+  # Nonprofits) : app + t2c.exe + t2c-peer.exe. Connexion OIDC, aucun secret.
+  # Inactive (fichiers inchangés) tant que la variable AZURE_SIGNING_ACCOUNT est vide.
+  # Guide : docs/SIGNATURE-WINDOWS.md.
+  sign-windows:
+    needs: [desktop, cli-macos]
+    name: Signature Windows (Azure)
+    runs-on: windows-latest
+    environment: signature-windows # sujet OIDC fixe, limité aux tags v* dans les réglages
+    permissions:
+      contents: read
+      id-token: write # jeton OIDC pour azure/login
+    env:
+      AZURE_SIGN_ON: ${{ vars.AZURE_SIGNING_ACCOUNT != '' }}
+    steps:
+      - name: Windows non signé
+        if: env.AZURE_SIGN_ON != 'true'
+        shell: pwsh
+        run: |
+          Write-Output "::warning::AZURE_SIGNING_ACCOUNT absent : exécutables Windows NON signés par Azure (alerte SmartScreen)"
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        if: env.AZURE_SIGN_ON == 'true'
+        with:
+          pattern: "{app-Windows-amd64,cli}"
+          path: in
+      - name: Extraire les exécutables
+        if: env.AZURE_SIGN_ON == 'true'
+        shell: pwsh
+        run: |
+          Expand-Archive in/app-Windows-amd64/T2C-Phantom-Windows-amd64.zip -DestinationPath sign/app
+          $cli = Get-Item in/cli/t2c-cli-*-windows-amd64.zip
+          Expand-Archive $cli.FullName -DestinationPath sign/cli
+          Get-ChildItem sign -Recurse -Filter *.exe | ForEach-Object { $_.FullName }
+
+      - name: Connexion Azure (OIDC)
+        if: env.AZURE_SIGN_ON == 'true'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Signer (Azure Artifact Signing, signtool)
+        if: env.AZURE_SIGN_ON == 'true'
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files-folder: ${{ github.workspace }}\sign
+          files-folder-filter: exe
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          description: T2C Phantom
+          description-url: https://github.com/TUTODECODE-FR/T2C-Phantom
+          # seule la session ouverte par azure/login sert
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+
+      - name: Vérifier et réempaqueter
+        if: env.AZURE_SIGN_ON == 'true'
+        shell: pwsh
+        run: |
+          $bad = 0
+          Get-ChildItem sign -Recurse -Filter *.exe | ForEach-Object {
+            $s = Get-AuthenticodeSignature $_.FullName
+            "$($_.Name) : $($s.Status) — $($s.SignerCertificate.Subject)"
+            if ($s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate) { $bad++ }
+          }
+          if ($bad) { Write-Error "$bad exécutable(s) mal signé(s) ou sans horodatage"; exit 1 }
+          New-Item -ItemType Directory out/app, out/cli | Out-Null
+          Compress-Archive -Path sign/app/* -DestinationPath out/app/T2C-Phantom-Windows-amd64.zip
+          # l'artefact « cli » est renvoyé en entier, la zip Windows remplacée par la signée
+          Copy-Item in/cli/* out/cli/
+          $cli = Get-Item in/cli/t2c-cli-*-windows-amd64.zip
+          Remove-Item "out/cli/$($cli.Name)"
+          Compress-Archive -Path sign/cli/* -DestinationPath "out/cli/$($cli.Name)"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: env.AZURE_SIGN_ON == 'true'
+        with:
+          name: app-Windows-amd64
+          path: out/app/*
+          overwrite: true
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: env.AZURE_SIGN_ON == 'true'
+        with:
+          name: cli
+          path: out/cli/*
+          overwrite: true
+          if-no-files-found: error
+
   notes:
     needs: check
     name: Notes de version
@@ -315,7 +419,7 @@ jobs:
           path: notes/notes.md
 
   release:
-    needs: [desktop, cli-macos, notes]
+    needs: [desktop, sign-windows, notes]
     if: github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
