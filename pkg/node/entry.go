@@ -195,6 +195,7 @@ func (n *Node) refreshGuards(doc entriesDoc, pol *trust.NetworkPolicy, keys []pe
 	own := n.hiddenRelayKey()
 	changed := false
 	var kept []guardRec
+	dropped := map[string]bool{} // retirées à l'instant : pas re-tirées au sort dans la foulée
 	for _, g := range gd.Guards {
 		recent := g.Fails[:0:0]
 		for _, f := range g.Fails {
@@ -210,7 +211,7 @@ func (n *Node) refreshGuards(doc entriesDoc, pol *trust.NetworkPolicy, keys []pe
 			len(g.Fails) >= guardFailMax || g.FirstFail > 0 && now.Sub(time.Unix(g.FirstFail, 0)) > guardDownMax ||
 			own.Equal(pk) || officialKey(pk, keys) || len(kept) >= 2
 		if drop {
-			changed = true
+			dropped[g.Key], changed = true, true
 			continue
 		}
 		kept = append(kept, g)
@@ -220,7 +221,7 @@ func (n *Node) refreshGuards(doc entriesDoc, pol *trust.NetworkPolicy, keys []pe
 		var cand []entryCand
 		for _, e := range doc.Entries {
 			pk, err := trust.ParsePublicKey(e.Key)
-			if err != nil || !volunteerURL(e.URL) || pol.Banned(e.Key) || own.Equal(pk) || officialKey(pk, keys) ||
+			if err != nil || dropped[e.Key] || !volunteerURL(e.URL) || pol.Banned(e.Key) || own.Equal(pk) || officialKey(pk, keys) ||
 				now.Sub(time.Unix(e.Since, 0)) < minAge {
 				continue
 			}
