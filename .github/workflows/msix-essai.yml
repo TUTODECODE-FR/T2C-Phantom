@@ -1,0 +1,149 @@
+# Essai MSIX (Microsoft Store) : les écritures de T2C Phantom sous Windows
+# (proxy PAC dans HKCU, certificat via certutil -user) sont-elles visibles hors
+# du paquet ? Deux variantes :
+#   defaut        : runFullTrust seul (isolation MSIX par défaut)
+#   nonvirtualise : + unvirtualizedResources, isolation HKCU/AppData désactivée
+# Témoin : la même sonde lancée hors paquet doit toujours être visible.
+# Lancement : gh workflow run msix-essai.yml --ref main
+name: Essai MSIX
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  essai:
+    name: MSIX ${{ matrix.variante }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variante: [defaut, nonvirtualise]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Dépôt du relais (go.mod le remplace par ../T2C-Phantom-relay)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          repository: TUTODECODE-FR/T2C-Phantom-relay
+          path: .t2c-relay
+          token: ${{ secrets.RELAY_REPO_TOKEN || github.token }}
+      - name: Relais à côté du dépôt
+        shell: bash
+        run: mv .t2c-relay ../T2C-Phantom-relay
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+
+      - name: Sonde
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory pkg/Assets -Force | Out-Null
+          go build -o pkg/probe.exe ./.github/msix-essai/probe
+          foreach ($n in 'StoreLogo','Square150x150Logo','Square44x44Logo') { Copy-Item desktop/build/appicon.png "pkg/Assets/$n.png" }
+
+      - name: Témoin hors paquet
+        shell: pwsh
+        run: |
+          pkg/probe.exe temoin
+          Get-Content C:\msix-essai\resultat-temoin.txt
+
+      - name: Manifeste (${{ matrix.variante }})
+        shell: pwsh
+        env:
+          VARIANTE: ${{ matrix.variante }}
+        run: |
+          $props = ''; $caps = ''
+          if ($env:VARIANTE -eq 'nonvirtualise') {
+            $props = '<desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization><desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>'
+            $caps = '<rescap:Capability Name="unvirtualizedResources"/>'
+          }
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+            xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+            xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+            xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+            IgnorableNamespaces="uap rescap desktop6">
+            <Identity Name="TUTODECODE.T2CEssaiMSIX" Publisher="CN=T2C-Essai" Version="1.0.0.0" ProcessorArchitecture="x64"/>
+            <Properties>
+              <DisplayName>T2C essai MSIX</DisplayName>
+              <PublisherDisplayName>TUTODECODE</PublisherDisplayName>
+              <Logo>Assets\StoreLogo.png</Logo>
+              $props
+            </Properties>
+            <Dependencies>
+              <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0"/>
+            </Dependencies>
+            <Resources><Resource Language="fr-fr"/></Resources>
+            <Applications>
+              <Application Id="App" Executable="probe.exe" EntryPoint="Windows.FullTrustApplication">
+                <uap:VisualElements DisplayName="T2C essai MSIX" Description="Essai d'isolation"
+                  BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png"/>
+              </Application>
+            </Applications>
+            <Capabilities>
+              <rescap:Capability Name="runFullTrust"/>
+              $caps
+            </Capabilities>
+          </Package>
+          "@ -replace '(?m)^          ','' | Set-Content -Encoding utf8 pkg/AppxManifest.xml
+          Get-Content pkg/AppxManifest.xml
+
+      - name: Empaqueter, signer (certificat de test), installer
+        shell: pwsh
+        run: |
+          $sdk = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin\*\x64\makeappx.exe' | Sort-Object FullName | Select-Object -Last 1
+          $bin = $sdk.DirectoryName
+          & "$bin\makeappx.exe" pack /o /d pkg /p essai.msix
+          if ($LASTEXITCODE) { exit 1 }
+          $c = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=T2C-Essai' -CertStoreLocation Cert:\CurrentUser\My -TextExtension @('2.5.29.19={text}')
+          $pw = ConvertTo-SecureString -String 'essai' -Force -AsPlainText
+          Export-PfxCertificate -Cert $c -FilePath essai.pfx -Password $pw | Out-Null
+          Export-Certificate -Cert $c -FilePath essai.cer | Out-Null
+          Import-Certificate -FilePath essai.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+          & "$bin\signtool.exe" sign /fd SHA256 /f essai.pfx /p essai essai.msix
+          if ($LASTEXITCODE) { exit 1 }
+          Add-AppxPackage -Path essai.msix
+          Get-AppxPackage TUTODECODE.T2CEssaiMSIX | Format-List Name,PackageFamilyName,InstallLocation
+
+      - name: Lancer la sonde dans le paquet
+        shell: pwsh
+        run: |
+          $p = Get-AppxPackage TUTODECODE.T2CEssaiMSIX
+          Invoke-CommandInDesktopPackage -PackageFamilyName $p.PackageFamilyName -AppId App -Command (Join-Path $p.InstallLocation 'probe.exe')
+          for ($i = 0; $i -lt 30 -and -not (Test-Path C:\msix-essai\resultat-paquet.txt); $i++) { Start-Sleep 2 }
+          if (-not (Test-Path C:\msix-essai\resultat-paquet.txt)) {
+            Write-Output "Invoke-CommandInDesktopPackage sans résultat : lancement par shell:AppsFolder"
+            Start-Process "shell:AppsFolder\$($p.PackageFamilyName)!App"
+            for ($i = 0; $i -lt 30 -and -not (Test-Path C:\msix-essai\resultat-paquet.txt); $i++) { Start-Sleep 2 }
+          }
+          Get-Content C:\msix-essai\resultat-paquet.txt
+
+      - name: Verdict (vu de l'extérieur du paquet)
+        shell: pwsh
+        env:
+          VARIANTE: ${{ matrix.variante }}
+        run: |
+          function Lire($m) {
+            $r = @{}; Get-Content "C:\msix-essai\resultat-$m.txt" | ForEach-Object { $k, $v = $_ -split '=', 2; $r[$k] = $v }; $r
+          }
+          $pac = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings').AutoConfigURL
+          $t = Lire 'temoin'; $q = Lire 'paquet'
+          $certT = [bool](Get-ChildItem Cert:\CurrentUser\My | Where-Object Thumbprint -eq $t.empreinte)
+          $certQ = [bool](Get-ChildItem Cert:\CurrentUser\My | Where-Object Thumbprint -eq $q.empreinte)
+          $pacQ = $pac -eq $q.pac
+          $l = @(
+            "## MSIX $env:VARIANTE",
+            "",
+            "| Écriture | témoin hors paquet | dans le paquet |",
+            "|---|---|---|",
+            "| proxy PAC (HKCU AutoConfigURL) | (écrasé ensuite) | $(if ($pacQ) {'VISIBLE'} else {"ISOLÉ (vu : $pac)"}) |",
+            "| certificat (certutil -user) | $(if ($certT) {'VISIBLE'} else {'ABSENT'}) | $(if ($certQ) {'VISIBLE'} else {'ISOLÉ'}) |"
+          )
+          $l | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+          $l -join "`n"
