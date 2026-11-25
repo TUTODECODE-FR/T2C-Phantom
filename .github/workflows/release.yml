@@ -98,7 +98,6 @@ jobs:
           persist-credentials: false
           repository: TUTODECODE-FR/T2C-Phantom-relay
           path: .t2c-relay
-          token: ${{ secrets.RELAY_REPO_TOKEN || github.token }}
       - name: Relais à côté du dépôt
         shell: bash
         run: mv .t2c-relay ../T2C-Phantom-relay
@@ -228,7 +227,6 @@ jobs:
           persist-credentials: false
           repository: TUTODECODE-FR/T2C-Phantom-relay
           path: .t2c-relay
-          token: ${{ secrets.RELAY_REPO_TOKEN || github.token }}
       - name: Relais à côté du dépôt
         shell: bash
         run: mv .t2c-relay ../T2C-Phantom-relay
