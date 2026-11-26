@@ -17,6 +17,10 @@
   <i>Pairs pseudonymes · Bénévoles audités · Chiffré de bout en bout · Sites signés</i>
 </div>
 
+> **État du projet : en test.** Le réseau T2C Phantom est en cours de validation et n'est pas encore ouvert au public.
+> Les versions publiées ici servent aux testeurs. La première version publique sera annoncée sur
+> [tutodecode.org](https://tutodecode.org/projets/#t2c-phantom) et sur [Mastodon](https://mastodon.social/@TUTODECODE).
+
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
 ## Présentation
@@ -103,8 +107,6 @@ Le relais (`T2C-Phantom-relay`) est sous la même licence. Le serveur origine de
 les consignes du réseau et les mises à jour sont signés par la clé racine de l'association, qui n'est pas distribuée.
 Une version modifiée ne peut ni se faire passer pour le réseau officiel, ni signer à sa place.
 Le nom et le logo TUTODECODE ne sont pas couverts par la licence.
-
-<img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
 <img src="https://raw.githubusercontent.com/TUTODECODE-FR/T2DECODE/main/assets/separator.svg" width="100%" height="4">
 
