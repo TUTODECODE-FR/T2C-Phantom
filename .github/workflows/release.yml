@@ -443,8 +443,9 @@ jobs:
             gh release upload "$TAG" out/* --clobber -R "$GITHUB_REPOSITORY"
             gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file notes/notes.md
           else
+            # pré-version tant que le réseau n'est pas ouvert au public (variable T2C_PUBLIC_RELEASE=true pour la sortie)
             gh release create "$TAG" out/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "T2C Phantom $TAG" --notes-file notes/notes.md
+              --title "T2C Phantom $TAG" --notes-file notes/notes.md ${{ vars.T2C_PUBLIC_RELEASE == 'true' && '--latest' || '--prerelease' }}
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
