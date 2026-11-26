@@ -162,7 +162,7 @@ jobs:
       - name: Exécutable Windows non signé (pour SignPath)
         id: unsigned
         if: runner.os == 'Windows' && env.SIGNPATH_ON == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-non-signe
           path: desktop/build/bin/T2C-Phantom.exe
@@ -206,7 +206,7 @@ jobs:
         if: runner.os == 'Linux'
         run: tar czf "T2C-Phantom-${{ matrix.name }}.tar.gz" -C desktop/build/bin T2C-Phantom
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: app-${{ matrix.name }}
           path: T2C-Phantom-${{ matrix.name }}.*
@@ -250,7 +250,7 @@ jobs:
             done
             if [ "$os" = windows ]; then zip -qr "dist/$out.zip" "$out"; else tar czf "dist/$out.tar.gz" "$out"; fi
           done
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cli
           path: dist/*
@@ -285,7 +285,7 @@ jobs:
             bash .github/scripts/macos-sign.sh binary "$d/t2c" "$d/t2c-peer"
             rm -f "$tgz" && tar czf "$tgz" "$d" && rm -rf "$d"
           done
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cli
           path: dist/*
@@ -380,14 +380,14 @@ jobs:
           Remove-Item "out/cli/$($cli.Name)"
           Compress-Archive -Path sign/cli/* -DestinationPath "out/cli/$($cli.Name)"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: env.AZURE_SIGN_ON == 'true'
         with:
           name: app-Windows-amd64
           path: out/app/*
           overwrite: true
           if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: env.AZURE_SIGN_ON == 'true'
         with:
           name: cli
@@ -411,7 +411,7 @@ jobs:
           bash .github/scripts/release-notes.sh "$TAG" "$GITHUB_REPOSITORY" > notes/notes.md
           cat notes/notes.md >> "$GITHUB_STEP_SUMMARY"
           cat notes/notes.md
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-notes
           path: notes/notes.md
@@ -447,7 +447,7 @@ jobs:
             gh release create "$TAG" out/* -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "T2C Phantom $TAG" --notes-file notes/notes.md ${{ vars.T2C_PUBLIC_RELEASE == 'true' && '--latest' || '--prerelease' }}
           fi
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-files
           path: out/*
